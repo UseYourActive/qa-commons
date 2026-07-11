@@ -1,0 +1,24 @@
+# Build output
+target/
+*.class
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local tooling (not part of the project)
+.claude/
+
+# Env files with real values
+.env
