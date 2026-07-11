@@ -1,8 +1,8 @@
 # Tasks: qa-commons
 
-- [ ] T1: Init repo and lay down the bare Maven skeleton — files: `.gitignore`, `README.md` (stub), `pom.xml` (parent: modules, dependencyManagement, compiler/surefire pluginManagement), `core/pom.xml`, `api/pom.xml`, `template/pom.xml` (empty, inherit parent) — done when: `git init` + this is the first commit; `mvn -q validate` succeeds from repo root with all 3 modules resolving.
+- [x] T1: Init repo and lay down the bare Maven skeleton — files: `.gitignore`, `README.md` (stub), `pom.xml` (parent: modules, dependencyManagement, compiler/surefire pluginManagement), `core/pom.xml`, `api/pom.xml`, `template/pom.xml` (empty, inherit parent) — done when: `git init` + this is the first commit; `mvn -q validate` succeeds from repo root with all 3 modules resolving.
 
-- [ ] T2: core — `QaConfig` env-based config record — files: `core/pom.xml` (+slf4j), `core/src/main/java/dev/qacommons/core/config/QaConfig.java`, `core/src/test/java/dev/qacommons/core/config/QaConfigTest.java` — done when: `mvn -pl core test` passes; tests cover default values, override via the `fromEnv(Function<String,String>)` seam, and the `QA_BASE_URL` default of `http://localhost:8080`.
+- [x] T2: core — `QaConfig` env-based config record — files: `core/pom.xml` (+slf4j), `core/src/main/java/dev/qacommons/core/config/QaConfig.java`, `core/src/test/java/dev/qacommons/core/config/QaConfigTest.java` — done when: `mvn -pl core test` passes; tests cover default values, override via the `fromEnv(Function<String,String>)` seam, and the `QA_BASE_URL` default of `http://localhost:8080`.
 
 - [ ] T3: core — `JsonMapperFactory` — files: `core/pom.xml` (+jackson-bom import, databind, jsr310), `core/src/main/java/dev/qacommons/core/json/JsonMapperFactory.java`, test — done when: `mvn -pl core test` passes; a test round-trips a record with an `Instant`/`UUID` field and asserts two `newMapper()` calls return distinct, independently-mutable instances.
 
