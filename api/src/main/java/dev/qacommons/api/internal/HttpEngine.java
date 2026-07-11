@@ -37,7 +37,15 @@ public final class HttpEngine {
     }
 
     public RawResponse execute(String method, String path, Object[] pathParams, String jsonBody) {
+        return execute(method, path, pathParams, Map.of(), jsonBody);
+    }
+
+    public RawResponse execute(String method, String path, Object[] pathParams, Map<String, Object> queryParams,
+            String jsonBody) {
         RequestSpecification request = RestAssured.given().spec(spec);
+        if (queryParams != null && !queryParams.isEmpty()) {
+            request = request.queryParams(queryParams);
+        }
         if (jsonBody != null) {
             request = request.contentType(ContentType.JSON).body(jsonBody);
         }

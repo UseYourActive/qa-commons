@@ -5,6 +5,7 @@ import dev.qacommons.api.Endpoint;
 import dev.qacommons.core.config.QaConfig;
 import dev.qacommons.template.model.ErrorResponse;
 import dev.qacommons.template.model.FailedNotificationsPage;
+import java.util.Map;
 
 public final class FailedNotificationsEndpoint extends Endpoint<Void, FailedNotificationsPage, ErrorResponse> {
 
@@ -13,6 +14,6 @@ public final class FailedNotificationsEndpoint extends Endpoint<Void, FailedNoti
     }
 
     public ApiResult<FailedNotificationsPage, ErrorResponse> list(int page, int size) {
-        return get("?page=" + page + "&size=" + size);
+        return getWithQuery("", Map.of("page", page, "size", size));
     }
 }

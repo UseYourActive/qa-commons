@@ -6,6 +6,7 @@ import dev.qacommons.api.internal.RawResponse;
 import dev.qacommons.api.internal.ResultClassifier;
 import dev.qacommons.core.config.QaConfig;
 import dev.qacommons.core.json.JsonMapperFactory;
+import java.util.Map;
 
 /**
  * Base class for one API resource. Not thread-safe for concurrent use of the
@@ -49,6 +50,20 @@ public abstract class Endpoint<TReq, TRes, TErr> {
         return execute("GET", basePath + pathSuffix, pathParams, null);
     }
 
+    /**
+     * Like {@link #get(String, Object...)}, but for query parameters instead
+     * of path parameters. A distinctly-named method rather than an overload
+     * of {@code get} - a {@code (String, Object...)} and a
+     * {@code (String, Map<String,Object>)} overload of the same name are a
+     * real Java varargs-overload-resolution trap once a caller passes both a
+     * map and further positional args. Values are passed through
+     * RestAssured's {@code queryParams(Map)}, which URL-encodes them - never
+     * build the query string yourself.
+     */
+    protected ApiResult<TRes, TErr> getWithQuery(String pathSuffix, Map<String, Object> queryParams) {
+        return execute("GET", basePath + pathSuffix, new Object[0], queryParams, null);
+    }
+
     protected ApiResult<TRes, TErr> post(TReq body) {
         return execute("POST", basePath, new Object[0], writeBody(body));
     }
@@ -75,6 +90,12 @@ public abstract class Endpoint<TReq, TRes, TErr> {
 
     private ApiResult<TRes, TErr> execute(String method, String path, Object[] pathParams, String jsonBody) {
         RawResponse response = engine.execute(method, path, pathParams, jsonBody);
+        return ResultClassifier.classify(response, successType, errorType, mapper);
+    }
+
+    private ApiResult<TRes, TErr> execute(String method, String path, Object[] pathParams,
+            Map<String, Object> queryParams, String jsonBody) {
+        RawResponse response = engine.execute(method, path, pathParams, queryParams, jsonBody);
         return ResultClassifier.classify(response, successType, errorType, mapper);
     }
 }
