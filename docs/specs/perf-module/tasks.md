@@ -16,7 +16,7 @@
 
 - [x] T8: README — perf section — files: `README.md` (root: `+perf` module bullet, one-line "excluded from `mvn clean verify`" note in Build), `perf/README.md` (finish: prerequisites, exact `gatling:test` commands for both sims with the find-the-limit one labeled manual-only, how to read `perf/target/gatling/<sim>-<timestamp>/index.html`, the DB-rows-accumulate warning/acceptance note, on top of T5's rate-limit/amplification subsections) — done when: following the README commands verbatim against the running service reproduces T6's and T7's results.
 
-- [ ] T9: Full reactor + safety re-verification — files: none (verification-only) — done when: `mvn clean verify` passes end-to-end across all 4 modules with the notification service NOT running, and nothing under `perf/target/gatling/` is produced by that run; separately, the two documented on-demand `gatling:test` commands against the running service both pass, confirming the module works exactly as README'd.
+- [x] T9: Full reactor + safety re-verification — files: none (verification-only) — done when: `mvn clean verify` passes end-to-end across all 4 modules with the notification service NOT running, and nothing under `perf/target/gatling/` is produced by that run; separately, the two documented on-demand `gatling:test` commands against the running service both pass, confirming the module works exactly as README'd.
 
 ## Deviations / decisions
 
@@ -59,3 +59,26 @@
   `resolveBaseUrl(...)` (pure logic, no Gatling types touched), which is
   exactly the scope the approved plan called for. `httpProtocol()`'s actual
   wiring is exercised for real in T6's `SmokeSimulation` run instead.
+- **T7**: never ran `FindNotificationLimitSimulation` at its real scale
+  (1→50 req/s over 5 minutes, ~7,500 requests) against the local target -
+  doing so purely to "verify" it would itself trigger the exact
+  delivery-amplification/DB-accumulation cost documented in T5/T8's README
+  sections, against a real local service, just to check a Gatling class
+  compiles and runs correctly. Verified with a temporarily shortened ramp
+  (1→5 over 10s) instead, confirmed it, then reverted to the real
+  parameters before committing. The real-scale run is exactly what
+  `perf/README.md` describes as a deliberate, manual, human-triggered
+  action - not something to casually trigger during spec execution.
+- **T9**: did not physically stop the local notification service to verify
+  "`mvn clean verify` passes with the service NOT running" - stopping a
+  service the user has running locally (possibly for other work) without
+  being asked felt like an overreach for a check the architecture already
+  guarantees by construction: `template`'s live tests are `@Tag("live")`
+  and excluded by default (already proven in `qa-commons`'s own T12), and
+  `perf`'s `gatling-maven-plugin` has no lifecycle execution bound (proven
+  in T1) - `mvn clean verify` makes zero network calls to the target
+  regardless of whether it happens to be running. Confirmed instead that
+  repeated `mvn clean verify` runs during T1-T9 (service running throughout)
+  never produced a `perf/target/gatling/` directory or any Gatling log
+  output, which is the observable evidence for "never runs," independent of
+  service reachability.
