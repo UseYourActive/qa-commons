@@ -34,6 +34,8 @@
     <!-- Independently-versioned artifacts - not expected to match numerically -->
     <gatling.version>3.15.1</gatling.version>
     <gatling-maven-plugin.version>4.21.8</gatling-maven-plugin.version>
+    <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -138,5 +140,50 @@
         </plugin>
       </plugins>
     </pluginManagement>
+    <!--
+      Not pluginManagement - these must actually execute (inherited by every
+      child module) so each published module jar gets a sources/javadoc jar
+      attached for consumers, per docs/specs/publishing/plan.md.
+    -->
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>${maven-source-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin.version}</version>
+        <configuration>
+          <source>${maven.compiler.release}</source>
+          <!--
+            Codebase has real but sparse Javadoc by convention. Strict
+            doclint can fail the build on incidental malformed HTML in
+            existing comments - this mission publishes the existing surface
+            as-is, not a docs audit, so doclint is relaxed rather than
+            letting an unrelated lint issue block a release.
+          -->
+          <doclint>none</doclint>
+          <quiet>true</quiet>
+        </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 </project>
