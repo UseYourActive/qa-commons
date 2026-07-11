@@ -162,9 +162,13 @@ version-pinned):
   latest stable (non-beta) releases on Maven Central as of 2026-07, matching
   how every other third-party version in this pom is pinned explicitly
   rather than left floating.
-- Applies to all four modules uniformly, including `perf`. This is a
-  packaging-only addition (extra jars produced at `package` phase) — it does
-  not touch the separate mechanism (no `<executions>` on
+- Applies uniformly at the root, including `perf` — but `perf` has no
+  `src/main/java` (everything lives under `src/test/java`, matching
+  Gatling's own convention per perf's own plan.md), so both plugins
+  correctly no-op there ("No sources/Javadoc in project. Archive not
+  created.") rather than producing an empty artifact. Verified during T2.
+  This is a packaging-only addition (extra jars produced at `package`
+  phase) — it does not touch the separate mechanism (no `<executions>` on
   `gatling-maven-plugin`) that keeps `mvn clean verify` from ever running a
   Gatling load test. The two are unrelated lifecycle concerns; nothing here
   changes perf's exclusion from default *execution*.

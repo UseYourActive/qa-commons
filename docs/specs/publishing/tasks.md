@@ -5,9 +5,10 @@
 
 - [ ] T2: source + javadoc jar attachment — files: `pom.xml` (root) — done
   when: `mvn clean verify` from repo root succeeds and produces
-  `*-sources.jar` and `*-javadoc.jar` in `core/target`, `api/target`,
-  `template/target`, and `perf/target`; `perf`'s Gatling execution is still
-  never triggered (no `<executions>` added to `gatling-maven-plugin`); no
+  `*-sources.jar` and `*-javadoc.jar` in `core/target`, `api/target`, and
+  `template/target`. `perf` has no `src/main/java` (everything lives under
+  `src/test/java` by its own design) so the plugins correctly skip it with
+  "No sources/Javadoc in project" — not a failure, not a gap to force. No
   Java source file in any module is modified.
 
 - [ ] T3: README — versioning + "Using qa-commons in your project" — files:
