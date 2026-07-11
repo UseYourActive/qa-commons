@@ -42,7 +42,21 @@ review" instruction given after T10.
   ambiguity risk between a `(String, Object...)` and a
   `(String, Map<String,Object>, Object...)` overload, and nothing in the
   template's 4 scenarios needs it. `FailedNotificationsEndpoint.list()`
-  builds its literal `?page=N&size=N` query string directly instead.
+  built its literal `?page=N&size=N` query string directly instead - **this
+  turned out wrong and was corrected post-merge-review**, see the fix entry
+  below. Leaving this entry as-is (not rewriting history) since it explains
+  why the gap existed in the first place.
+- **Post-T12 fix**: `FailedNotificationsEndpoint.list()`'s hand-built query
+  string was flagged as violating the endpoint-object pattern (a template
+  module must not demonstrate manual query-string concatenation) and as a
+  correctness risk (no URL-encoding). Fixed by adding
+  `Endpoint.getWithQuery(pathSuffix, Map<String,Object>)` - a **distinctly
+  named** method, not an overload of `get`, avoiding the exact
+  varargs-ambiguity trap that motivated dropping query-param support in T7
+  - backed by RestAssured's `queryParams(Map)` for proper encoding. Two new
+  stub-server tests in `EndpointTest` cover encoding of a space/`&`-bearing
+  value and multiple params. One commit, re-verified against the live
+  service twice with no flakes.
 - **T9 (major)**: the real service diverged from the plan's working
   assumptions in ways beyond what amendment 2 anticipated — full findings
   and the resulting redesign are recorded in plan.md's Risks section and

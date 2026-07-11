@@ -235,14 +235,22 @@ public final class FailedNotificationsEndpoint
         super(config, "/api/v1/notifications/failed", FailedNotificationsPage.class, ErrorResponse.class);
     }
     public ApiResult<FailedNotificationsPage, ErrorResponse> list(int page, int size) {
-        return get("?page=" + page + "&size=" + size);
+        return getWithQuery("", Map.of("page", page, "size", size));
     }
 }
 ```
-`list`'s query string is appended directly as literal text (both params are
-`int`s, no encoding risk) rather than extending `Endpoint`'s path-param
-surface with query-param support - avoids growing the T7-approved API
-surface for a single call site.
+`list` uses `Endpoint.getWithQuery(pathSuffix, Map<String,Object>)` — added
+post-T10, in a follow-up fix, specifically so the template never teaches
+hand-built query strings. `getWithQuery` is a **distinctly-named** method
+rather than an overload of `get`: a `(String, Object...)` and a
+`(String, Map<String,Object>)` overload of the same name is a genuine Java
+varargs-overload-resolution trap once a caller passes both a map and further
+positional args, which is exactly the ambiguity risk that made T7 drop
+query-param support from `get` in the first place. The distinct name sidesteps
+that risk entirely while still avoiding manual query-string concatenation -
+values are passed through RestAssured's `queryParams(Map)`, which does the
+URL-encoding. Covered by two stub-server tests in `api`'s `EndpointTest`
+(a value containing a space and a literal `&`, and multiple params).
 
 `NotificationRequests` factory drops `withIdempotencyKey(...)` (no such
 field exists); keeps `valid()` / `missingRecipient()`.
