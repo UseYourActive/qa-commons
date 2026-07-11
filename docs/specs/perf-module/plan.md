@@ -82,6 +82,18 @@ Non-goals:
   **only** via an explicit `mvn gatling:test` / `mvn -pl perf gatling:test`
   invocation. `mvn clean verify` from the repo root still compiles
   `perf`'s test sources (harmless) but never triggers a Gatling run.
+- **Verified during T1**: `gatling:test` is a directly-invoked Mojo, not a
+  lifecycle-phase goal — unlike `mvn -pl template -am test` (which works
+  fine because bound lifecycle goals are scoped per-project automatically),
+  `mvn -pl perf -am gatling:test` actually applies the goal to *every*
+  project the reactor resolves (including the `pom`-packaging root
+  aggregator, which has no test output and always fails with "No
+  simulations to run"), aborting before it ever reaches `perf`. The correct
+  two-step pattern is: install dependencies once via a real lifecycle phase
+  where `-am` behaves normally (`mvn install -pl perf -am -DskipTests`),
+  then invoke `gatling:test` scoped to `perf` alone, **no `-am`**
+  (`mvn -pl perf gatling:test -Dgatling.simulationClass=...`). Every command
+  in this plan and in `perf/README.md` uses that two-step pattern.
 - Simulation classes are named `*Simulation.java` (`SmokeSimulation`,
   `FindNotificationLimitSimulation`), never `*Test.java`/`*Tests.java` —
   Surefire's default include glob (`**/*Test.java`, `**/Test*.java`,
@@ -238,8 +250,11 @@ Investigated directly against the target's source (a local clone of
   section stating `mvn clean verify` never runs perf (mirroring the existing
   `template` live-suite note).
 - New `perf/README.md`: prerequisites (notification service running, same
-  as `template/README.md`), exact commands for both sims
-  (`mvn -pl perf -am gatling:test -Dgatling.simulationClass=dev.qacommons.perf.simulations.SmokeSimulation`
+  as `template/README.md`; **and** `core`/`api`/`template`/`perf` installed
+  to the local repo once via `mvn install -pl perf -am -DskipTests` — see
+  the note below on why `-am` can't be combined with the `gatling:test`
+  invocation itself), exact commands for both sims
+  (`mvn -pl perf gatling:test -Dgatling.simulationClass=dev.qacommons.perf.simulations.SmokeSimulation`
   and the find-the-limit equivalent, labeled manual-only), how to read the
   generated `perf/target/gatling/<sim>-<timestamp>/index.html` report
   (global stats, response-time percentile chart, requests/sec chart, the
