@@ -2,6 +2,11 @@
 
 Personal multi-module test automation framework.
 
+## Requirements
+
+- Java 21
+- Maven 3.9+
+
 ## Modules
 
 - `core` — typed env-based config, Jackson mapper factory, seeded datafaker
