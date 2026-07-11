@@ -185,7 +185,13 @@ pom's internal version string entirely): a consumer depends on the git tag
 between "what the pom says" and "what was released." Documented explicitly
 in the README so this isn't rediscovered by surprise later:
 - Tags (`vX.Y.Z`, pushed to `origin`) are releases — the only thing a
-  consumer should ever depend on.
+  consumer should ever depend on. Tags are cut on `main` only, after a
+  feature branch has been reviewed and merged there — never on the feature
+  branch itself, so the tag can't end up pointing at a commit that fails to
+  land as an ancestor of `main` (e.g. a later squash-merge). Decided during
+  execution, before T4: this branch (`feature/publishing`) finishes T1–T3
+  and is pushed for review; T4 (tag+push) and everything after it resume
+  only once it's merged.
 - The pom's `X.Y.Z-SNAPSHOT` is a local-only development marker; it is never
   itself a valid consumer coordinate and is not expected to numerically
   track the most recent tag.

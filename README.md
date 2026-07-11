@@ -103,6 +103,12 @@ ever moves to Maven Central or GitHub Packages, versioning goes back to real
 per-release version bumps in the pom — that's a different publishing
 mechanism with different rules, not an extension of this one.
 
+Release tags are cut on `main` only, after merge — never on feature
+branches. A tag pushed from a feature branch risks pointing at a commit that
+never ends up as an ancestor of `main` (e.g. if that branch is later squash-
+merged instead of merged normally), leaving JitPack building and caching a
+release against orphaned history.
+
 ## Design docs
 
 See `docs/specs/qa-commons/plan.md` and `docs/specs/qa-commons/tasks.md` for

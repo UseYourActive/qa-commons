@@ -17,9 +17,11 @@
   minimal `Endpoint` usage example), and the existing Modules/Build sections
   are otherwise unchanged.
 
-- [ ] T4: tag and push v0.1.0 — files: none (git only) — done when: `git tag
-  v0.1.0` exists locally, pushed to `origin`, pointing at the commit that
-  includes T1–T3.
+- [ ] T4: tag and push v0.1.0 — files: none (git only) — **blocked: wait
+  until `feature/publishing` is reviewed and merged into `main`; tags are
+  cut on `main` only, per the amendment in plan.md.** Done when: `git tag
+  v0.1.0` exists locally, pushed to `origin`, pointing at a commit on
+  `main`.
 
 - [ ] T5: verify the real JitPack build for v0.1.0 — files: none
   (verification only, findings folded back into plan.md's Risks if reality
