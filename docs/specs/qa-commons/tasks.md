@@ -8,7 +8,7 @@
 
 - [x] T4: core — `SeededFaker` base + seed logging — files: `core/pom.xml` (+datafaker), `core/src/main/java/dev/qacommons/core/testdata/SeededFaker.java`, test — done when: `mvn -pl core test` passes; test asserts same seed → same generated sequence, different seeds → different sequences, and that the seed is logged at INFO on construction.
 
-- [ ] T5: core — AssertJ soft-assertion convention (docs + example, no new prod class) — files: `core/pom.xml` (+assertj-core, compile scope), `core/src/test/java/dev/qacommons/core/conventions/SoftAssertionConventionExampleTest.java`, `core/README.md` — done when: `mvn -pl core test` passes including the example test; README shows the copy-pasteable `@InjectSoftAssertions` pattern.
+- [x] T5: core — AssertJ soft-assertion convention (docs + example, no new prod class) — files: `core/pom.xml` (+assertj-core, compile scope), `core/src/test/java/dev/qacommons/core/conventions/SoftAssertionConventionExampleTest.java`, `core/README.md` — done when: `mvn -pl core test` passes including the example test; README shows the copy-pasteable `@InjectSoftAssertions` pattern.
 
 - [ ] T6: api — `ApiResult` sealed hierarchy — files: `api/pom.xml` (+core, assertj), `api/src/main/java/dev/qacommons/api/ApiResult.java`, `api/src/test/java/dev/qacommons/api/ApiResultTest.java` — done when: `mvn -pl api test` passes; covers `Success.expectSuccess()`, `Failure.expectFailure()` throwing when called on the wrong variant, and `Unparsed` construction — no RestAssured involved yet.
 
