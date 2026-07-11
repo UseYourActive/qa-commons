@@ -1,6 +1,7 @@
 # Build output
 target/
 *.class
+allure-results/
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

@@ -130,64 +130,155 @@ Non-goals:
   states: immutable spec, but construct one `Endpoint` per test/thread
   rather than sharing an instance across threads.
 
-### template (`dev.qacommons.template`)
+### template (`dev.qacommons.template`) — REVISED after probing the real service (T9)
 
-- Records: `CreateNotificationRequest(String recipient, String channel,
-  String message, String idempotencyKey)`, `NotificationResponse(UUID id,
-  String recipient, String channel, String message, String status, Instant
-  createdAt)`, `ErrorResponse(String code, String message, List<String>
-  details)`. Field names/status codes are a working assumption — Task 9
-  confirms them against the real notification service and adjusts before
-  tests are written.
-- `api.NotificationsEndpoint extends Endpoint<CreateNotificationRequest,
-  NotificationResponse, ErrorResponse>` — `create(request)` → `post(request)`
-  at `/api/v1/notifications`; `getById(id)` → `get("/{id}", id)`.
-- `testdata.NotificationRequests extends SeededFaker` — `valid()`,
-  `missingRecipient()`, `withIdempotencyKey(key)`, fluent and named by
-  intent.
-- **409/idempotency determinism under parallel execution**: no hardcoded
-  shared key (that would itself be static shared state). Each test method
-  generates its own key via `"dup-test-" + UUID.randomUUID()` as a **local
-  variable**, reused for both calls within that one test method — same key
-  drives the dedup path within a test, but every test/run gets a fresh key,
-  so parallel runs never collide.
-- Four tests in `tests.NotificationsTest`, all `@Tag("live")` (see gating
-  below):
-  - `createNotification_returns202` — create → 202.
-  - `getNotificationById_returnsIdentityFields` — create then fetch; asserts
-    **identity fields only**: `id`, `recipient`, `channel`, `message`. Never
-    asserts `status` — it's timing-dependent (QUEUED/PROCESSING/SENT races
-    against the service's own poller), so asserting it would make the test
-    flaky by construction, not by bug.
-  - `duplicateCreate_...` — **contingent on T9's investigation**, see
-    "Duplicate-request contingency" below. Not assumed to be a 409 test.
-  - a negative/typed-error path with a non-empty `expectFailure().details()`
-    (or equivalent typed error code) — concrete trigger (missing recipient,
-    invalid channel, etc.) also confirmed in T9.
-- **Duplicate-request contingency**: originally assumed duplicate `create()`
-  calls return 409 `NOTIF_081`. The service's actual behavior is understood
-  to be a server-side PK conflict producing 409, which duplicate *client*
-  requests likely don't trigger — a second identical create is expected to
-  return 202 with silent dedup at intake, not 409. T9 verifies this against
-  the real, running service before any test is written, then T10
-  implements whichever is true:
-  - **Dedup confirmed** (second call → 202, single record processed): write
-    `duplicateCreate_dedupsSilently` asserting the second response is 202
-    and that only one notification exists for that idempotency key (e.g. via
-    `getById` or a list/count if the API supports it) — this is still a
-    "positive-looking but semantically distinct" flow proving the typed
-    result handles it, and does NOT replace the negative/typed-error test.
-  - **409 confirmed reachable some other way** (e.g. genuine PK conflict is
-    triggerable client-side): keep the `expectFailure().code() ==
-    "NOTIF_081"` assertion, using whatever request shape actually produces
-    it.
-  - Either way, the module still needs at least one negative test hitting a
-    genuinely typed 4xx error (invalid channel is the fallback trigger if
-    missing-recipient turns out not to error) — the duplicate scenario must
-    not be the only negative-shaped test if it turns out to be a 202 path.
-  - If reality forces this branch, T9 also gets a short note appended to
-    this plan's Risks section (per spec-driven-dev: update the plan, don't
-    silently diverge) recording what was actually found.
+The service is a Quarkus app; its OpenAPI spec (`GET /q/openapi?format=json`,
+Swagger UI at `/q/swagger-ui`, health at `/q/health/ready`) and direct curl
+probes against a locally running instance turned up real behavior that
+contradicts the plan's original working assumptions. Per spec-driven-dev,
+this section replaces (not appends to) the original template design below.
+
+Confirmed via live probing:
+- `POST /api/v1/notifications/send` (not `/api/v1/notifications`) with body
+  `{channel, recipient, templateName?, message?, data?}` (`channel` and
+  `recipient` required) → **202 Accepted**,
+  `{notificationId, status:"QUEUED", message, timestamp, recipient,
+  channel}`. `timestamp` is a **`LocalDateTime` with no zone offset**
+  (`"2026-07-11T10:54:45.938558279"`), not an `Instant`.
+- Missing `recipient` → **400**, `{code:"VALIDATION_FAILED", details:[...],
+  message, timestamp}` — a clean typed error; works as the negative/typed-
+  error scenario exactly as planned.
+- **No GET-by-id endpoint exists anywhere in the spec.** The only read
+  endpoints are `GET /api/v1/notifications/failed` (paginated, FAILED-status
+  only), `GET /api/v1/channels`, `GET /api/v1/metrics/today`. There is no way
+  to fetch a single notification by id.
+- **No dedup/409 behavior.** Sending an identical payload (same recipient/
+  channel/templateName/data) twice back-to-back returned **two 202s with two
+  different `notificationId`s** — no dedup, no 409, no `NOTIF_081` anywhere
+  in the spec, despite the endpoint's prose docs claiming a 5-minute dedup
+  window. The docs are wrong or the feature isn't wired up; either way, the
+  observed behavior is what the test asserts.
+- An invalid `channel` enum value (e.g. `"CARRIER_PIGEON"`) causes an
+  **unhandled 500 plain-text crash**, not a graceful validation error — ruled
+  out as a negative-test candidate (would couple a test to a live bug that's
+  expected to get fixed).
+- A nonexistent `templateName` is **silently accepted** (202 QUEUED, fails
+  later async) — also ruled out as a negative-test candidate for the same
+  reason.
+- There is **no `idempotencyKey` field** in the real request schema at all;
+  the plan's assumed client-supplied dedup key never existed. Dropped from
+  the model entirely.
+
+Revised scope, decided with the user after presenting these findings:
+1. **Create** — `POST /api/v1/notifications/send` → 202, unchanged in spirit
+   from the original plan, just corrected path/fields.
+2. **List failed notifications** replaces get-by-id — `GET
+   /api/v1/notifications/failed` is the closest thing to a second read path
+   that actually exists; different verb/shape (pagination) than create, so
+   it's still a meaningfully distinct scenario.
+3. **Missing recipient → 400** — unchanged, already matched real behavior.
+4. **Duplicate-as-independent-behavior replaces duplicate → 409** — asserts
+   the real, verified contract: two identical `create()` calls return two
+   *distinct* `notificationId`s, neither erroring. This is honest
+   documentation of actual service behavior (not the originally assumed
+   dedup/409), is deterministic (no timing/rate-limit dependency), and if the
+   service ever gains real idempotency, this test failing is exactly the
+   right signal that the contract changed.
+
+Revised data model (`dev.qacommons.template.model`):
+```java
+public enum NotificationChannel { EMAIL, SMS, TELEGRAM }
+public enum NotificationStatus { QUEUED, PROCESSING, SENT, FAILED }
+
+public record CreateNotificationRequest(
+    NotificationChannel channel, String recipient, String templateName,
+    String message, Map<String, Object> data) {}
+
+public record NotificationResponse(
+    String notificationId, NotificationStatus status, String message,
+    LocalDateTime timestamp, String recipient, String channel) {}
+
+public record ErrorResponse(String code, String message, List<String> details) {}
+
+public record FailedNotificationSummary(
+    String notificationId, String recipient, String channel, String templateName,
+    NotificationStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {}
+
+public record FailedNotificationsPage(
+    List<FailedNotificationSummary> items, int page, int size, long totalItems, int totalPages) {}
+```
+
+`NotificationResponse.channel` stays a plain `String` (matching the schema,
+which does not `$ref` the enum for this field) even though
+`CreateNotificationRequest.channel` is the typed enum — well-typed on the
+way in, liberal on the way out, so an unexpected server value can't turn a
+should-be-`Success` into an `Unparsed`.
+
+Two endpoint classes, since `Endpoint<TReq,TRes,TErr>` fixes one
+response/error type pair per instance and this resource now has two
+genuinely different read shapes (one endpoint class per resource, per the
+endpoint-object-pattern skill):
+```java
+public final class NotificationsEndpoint
+        extends Endpoint<CreateNotificationRequest, NotificationResponse, ErrorResponse> {
+    public NotificationsEndpoint(QaConfig config) {
+        super(config, "/api/v1/notifications/send", NotificationResponse.class, ErrorResponse.class);
+    }
+    public ApiResult<NotificationResponse, ErrorResponse> send(CreateNotificationRequest request) {
+        return post(request);
+    }
+}
+
+public final class FailedNotificationsEndpoint
+        extends Endpoint<Void, FailedNotificationsPage, ErrorResponse> {
+    public FailedNotificationsEndpoint(QaConfig config) {
+        super(config, "/api/v1/notifications/failed", FailedNotificationsPage.class, ErrorResponse.class);
+    }
+    public ApiResult<FailedNotificationsPage, ErrorResponse> list(int page, int size) {
+        return getWithQuery("", Map.of("page", page, "size", size));
+    }
+}
+```
+`list` uses `Endpoint.getWithQuery(pathSuffix, Map<String,Object>)` — added
+post-T10, in a follow-up fix, specifically so the template never teaches
+hand-built query strings. `getWithQuery` is a **distinctly-named** method
+rather than an overload of `get`: a `(String, Object...)` and a
+`(String, Map<String,Object>)` overload of the same name is a genuine Java
+varargs-overload-resolution trap once a caller passes both a map and further
+positional args, which is exactly the ambiguity risk that made T7 drop
+query-param support from `get` in the first place. The distinct name sidesteps
+that risk entirely while still avoiding manual query-string concatenation -
+values are passed through RestAssured's `queryParams(Map)`, which does the
+URL-encoding. Covered by two stub-server tests in `api`'s `EndpointTest`
+(a value containing a space and a literal `&`, and multiple params).
+
+`NotificationRequests` factory drops `withIdempotencyKey(...)` (no such
+field exists); keeps `valid()` / `missingRecipient()`.
+
+### template test scenarios (final, post-T9-investigation)
+
+Four tests in `tests.NotificationsTest`, all `@Tag("live")` (see gating
+below), against the two endpoint classes above:
+- `send_returns202Queued` — `send(NotificationRequests.valid())` → 202,
+  `expectSuccess().status() == QUEUED`.
+- `listFailedNotifications_returns200` — `FailedNotificationsEndpoint.list(0,
+  20)` → 200, asserts the page shape (`page`/`size`/`items` non-null); does
+  not depend on any specific notification having failed yet.
+- `send_missingRecipient_returns400ValidationFailed` — `expectFailure().code()
+  == "VALIDATION_FAILED"`, non-empty `details()`.
+- `send_duplicatePayload_producesTwoIndependentNotifications` — same
+  `CreateNotificationRequest` (one local variable, not a shared/static
+  constant) sent twice; asserts both are 202 and their `notificationId`s
+  differ — documents the real (no-dedup) contract, deterministic, no
+  timing/rate-limit dependency.
+
+No idempotency-key determinism concern remains: there's no client-supplied
+key in the real schema, and the duplicate test's only shared state is a
+request record built fresh as a local variable per test method (via a
+per-test `NotificationRequests` instance), so parallel runs of this test
+never collide with each other the same way T2-era `SeededFaker` instances
+don't.
+
 - **Live-vs-unit gating**: all four scenarios require the real notification
   service and are tagged `@Tag("live")`. `template`'s `pom.xml` sets
   `<excludedGroups>live</excludedGroups>` as a property default, so `mvn
@@ -226,21 +317,35 @@ DB migrations in this scope.
 - Malformed/non-JSON error body on a non-2xx response → `ApiResult.Unparsed`
   instead of a deserialization exception, so tests can still assert on
   status/raw body.
-- Duplicate-create races under parallel execution → avoided structurally by
-  per-test-local idempotency keys (see above), not by suite-level
-  serialization.
+- Duplicate-create races under parallel execution → avoided structurally:
+  each test builds its own request as a local variable via a per-test
+  `NotificationRequests` instance, so parallel test methods never share a
+  request object or any dedup-relevant state.
 
 ## Risks & open questions
 
-- **Real API contract unknown**: field names/paths/status codes above
-  (`/api/v1/notifications`, `NOTIF_081`, 202/200/409) are a working
-  assumption. Task 9 (scaffolding) and Task 10 (tests) are where this gets
-  confirmed and adjusted against the real, locally-running notification
-  service — this is expected, not a blocker to starting.
-- **Duplicate-request behavior specifically**: per the "Duplicate-request
-  contingency" note above, 409 `NOTIF_081` is expected from a server-side PK
-  conflict, not from duplicate client posts. T9 investigates and this
-  section gets a follow-up note recording the actual finding once known.
+- **Real API contract — RESOLVED in T9** by probing the live Quarkus service
+  (`/q/openapi?format=json`) and direct curl calls:
+  - Create is `POST /api/v1/notifications/send`, not
+    `/api/v1/notifications`; success is 202 with `status: QUEUED` and a
+    `LocalDateTime` (no zone) `timestamp` field, not `Instant`.
+  - **There is no GET-by-id endpoint at all.** Nearest read path is `GET
+    /api/v1/notifications/failed` (paginated, FAILED-only) — used as the
+    template's second scenario instead.
+  - **No dedup/409 exists in practice**, despite the endpoint's prose docs
+    claiming a 5-minute dedup window: two identical payloads sent
+    back-to-back produced two 202s with two different `notificationId`s.
+    No `NOTIF_081` appears anywhere in the spec. The template's duplicate
+    scenario now asserts this real behavior instead of a 409.
+  - An invalid `channel` value 500s (unhandled exception); a nonexistent
+    `templateName` is silently accepted and fails async later. Both ruled
+    out as negative-test triggers - the first couples a test to a live bug
+    expected to get fixed, the second doesn't produce a synchronous typed
+    error to assert on.
+  - `idempotencyKey` never existed in the real request schema - dropped
+    from the model.
+  - See "template test scenarios (final, post-T9-investigation)" above for
+    the resulting design.
 - **Auth**: assumed unnecessary for local runs; `Endpoint`'s constructor has
   no auth parameter in v1. If the real service requires it, add a minimal
   pluggable mechanism when that need is confirmed rather than building it
