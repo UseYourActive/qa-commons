@@ -16,6 +16,8 @@ Personal multi-module test automation framework.
   detail of this module only.
 - `template` — living example: tests against a notification service proving
   the framework end to end.
+- `perf` — Gatling load tests against the notification service. On-demand
+  only, see below.
 
 ## Build
 
@@ -25,10 +27,12 @@ mvn clean verify
 
 Runs the full reactor. The `template` module's service-dependent tests are
 tagged `@Tag("live")` and excluded by default, so this passes without any
-external service running.
+external service running. `perf` compiles as part of the reactor but never
+runs here — its `gatling-maven-plugin` has no lifecycle binding, so a
+Gatling run only ever happens via an explicit `mvn -pl perf gatling:test`.
 
 See `template/README.md` for how to run the live suite against a local
-notification service.
+notification service, and `perf/README.md` for how to run the perf sims.
 
 ## Design docs
 

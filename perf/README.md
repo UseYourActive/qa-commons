@@ -5,8 +5,62 @@ this module is wired into the parent reactor for compilation but is never
 run by `mvn clean verify`. See the root `README.md` for that guarantee's
 enforcement.
 
-<!-- Prerequisites, exact run commands for both sims, and how to read a
-     Gatling report are added in T8. -->
+## Prerequisites
+
+1. The notification service running locally with **placeholder** provider
+   credentials — same setup as `template/README.md`. Do not point a perf
+   run at a target with real provider credentials (see "Provider
+   credentials & delivery amplification" below).
+2. `core`/`api`/`template`/`perf` installed to your local Maven repo once:
+   ```
+   mvn install -pl perf -am -DskipTests
+   ```
+   This is required because `gatling:test` is a directly-invoked Mojo, not
+   a lifecycle-phase goal — unlike `mvn -pl template -am test`, combining
+   `-am` with `gatling:test` itself doesn't work (it applies the goal to
+   every reactor project, including the `pom`-packaging root, which always
+   fails with "No simulations to run" before reaching `perf`). Installing
+   first, then invoking `gatling:test` scoped to `perf` alone, sidesteps
+   that entirely. Re-run this step whenever `core`/`api`/`template` change.
+
+## Running the simulations
+
+Smoke sim — the "is it wired right" check, ~30 seconds, safe to run
+whenever protocol/steps/scenario or the target service changes:
+
+```
+mvn -pl perf gatling:test -Dgatling.simulationClass=dev.qacommons.perf.simulations.SmokeSimulation
+```
+
+Find-the-limit sim — **MANUAL-ONLY**, ~5 minutes, ramps up to 50 requests/
+second and is expected to produce failures near the top of the ramp (that's
+the point — see the class Javadoc):
+
+```
+mvn -pl perf gatling:test -Dgatling.simulationClass=dev.qacommons.perf.simulations.FindNotificationLimitSimulation
+```
+
+Never schedule either of these — both are opt-in, human-triggered runs.
+
+## Reading the report
+
+Each run prints a path like
+`perf/target/gatling/<simulation>-<timestamp>/index.html` — open it in a
+browser. The parts worth looking at:
+
+- **The assertions banner** at the very bottom of the console output (also
+  on the report's landing page) — pass/fail for exactly the checks defined
+  in the simulation class. This is the first thing to check, before any
+  chart.
+- **Global stats** (top of the page) — total requests, OK/KO split, mean/
+  percentile response times, mean throughput. For the smoke sim, KO should
+  be 0 and p95 should track well under the 800ms assertion threshold.
+- **Response Time Percentiles over Time** chart — whether latency stays
+  flat or climbs as load increases; on the find-the-limit sim, this is
+  where "the limit" actually shows up.
+- **Requests per second** chart — confirms the actual injected rate matched
+  what the simulation asked for (Gatling reports this per-second, live,
+  during the run too).
 
 ## Rate limiting
 
@@ -74,3 +128,18 @@ client-side numbers (response time, requests/sec) only describe the
 volume behind a report's headline numbers aren't visible in Gatling's
 report at all; keep that in mind when comparing a perf run's injected rate
 to how hard the target actually worked.
+
+## Real data accumulates - there is no cleanup
+
+Every perf run leaves real `Notification` rows in the target service's
+database, permanently. The service has no dedup (confirmed in
+`qa-commons`'s own template investigation, see
+`docs/specs/qa-commons/plan.md`), so a smoke run's 60 requests are 60 new
+rows, and a full find-the-limit run is thousands. This module does not
+clean any of it up, and isn't going to - that would need DB access this
+framework deliberately doesn't have (see `docs/specs/perf-module/plan.md`'s
+Non-goals). Treat this as an accepted cost of perf-testing against a real
+backend rather than a mock: run perf sims against a target you're fine
+accumulating test data in (a local Docker Compose instance you can
+`docker-compose down -v` when you're done is the easy answer), never
+against anything you'd call a shared or persistent environment.
