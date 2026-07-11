@@ -16,6 +16,26 @@
   <name>qa-commons-template</name>
   <description>Living example: qa-commons framework exercised against a real notification service.</description>
 
+  <properties>
+    <groups></groups>
+    <excludedGroups>live</excludedGroups>
+  </properties>
+
+  <profiles>
+    <profile>
+      <id>live</id>
+      <activation>
+        <property>
+          <name>runLive</name>
+        </property>
+      </activation>
+      <properties>
+        <groups>live</groups>
+        <excludedGroups></excludedGroups>
+      </properties>
+    </profile>
+  </profiles>
+
   <dependencies>
     <dependency>
       <groupId>dev.qacommons</groupId>
@@ -46,4 +66,17 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <groups>${groups}</groups>
+          <excludedGroups>${excludedGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
