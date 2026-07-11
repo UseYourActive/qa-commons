@@ -22,4 +22,64 @@
 
 - [x] T11: README — full setup + "run the notification service locally" + live-suite opt-in — files: `README.md` (root), `template/README.md` — done when: following the documented steps top-to-bottom from a fresh clone (start the service, then `mvn -pl template test -DrunLive=true`) reproducibly passes, and the README explicitly documents that plain `mvn clean verify` skips the live suite.
 
-- [ ] T12: Full reactor verification — files: none (verification-only; may add a `Makefile`/`justfile` convenience target) — done when: `mvn clean verify` passes end-to-end across all 3 modules with the notification service NOT running (live tests excluded by default); a separate documented `-DrunLive=true` run against the running service also passes.
+- [x] T12: Full reactor verification — files: none (verification-only; may add a `Makefile`/`justfile` convenience target) — done when: `mvn clean verify` passes end-to-end across all 3 modules with the notification service NOT running (live tests excluded by default); a separate documented `-DrunLive=true` run against the running service also passes.
+
+## Deviations / decisions
+
+Judgment calls made during execution, for review. All were reasoned from the
+already-approved plan/amendments and existing skill conventions; flagging
+here rather than re-asking per the "stop asking me per-question, batch for
+review" instruction given after T10.
+
+- **T2**: pulled `assertj-core` in one task earlier than tasks.md originally
+  listed (compile scope from T2, not deferred to T5) so `core`'s own tests
+  from T2 onward use AssertJ consistently, matching the architecture skill's
+  "AssertJ for all assertions" rather than mixing plain JUnit assertions in
+  early tasks and switching later.
+- **T7**: dropped query-param support from `Endpoint`'s public verb surface
+  (only path-param varargs). Not in the user's original v1 scope ("typed
+  verb methods with path params" only), avoids a real Java varargs-overload
+  ambiguity risk between a `(String, Object...)` and a
+  `(String, Map<String,Object>, Object...)` overload, and nothing in the
+  template's 4 scenarios needs it. `FailedNotificationsEndpoint.list()`
+  builds its literal `?page=N&size=N` query string directly instead.
+- **T9 (major)**: the real service diverged from the plan's working
+  assumptions in ways beyond what amendment 2 anticipated — full findings
+  and the resulting redesign are recorded in plan.md's Risks section and
+  "template test scenarios (final, post-T9-investigation)" section. Two
+  divergences were surfaced to the user directly via AskUserQuestion (no
+  GET-by-id endpoint at all; no dedup/409 behavior) since they changed two
+  of the four originally-named scenarios; resolved as: create/send (202,
+  unchanged), list-failed-notifications (replaces get-by-id),
+  missing-recipient/400 (unchanged, matched first try), duplicate-produces-
+  two-independent-notifications (replaces duplicate/409).
+- **T9**: added a second endpoint class, `FailedNotificationsEndpoint`,
+  rather than extending `NotificationsEndpoint` — `Endpoint<TReq,TRes,TErr>`
+  fixes one response/error type pair per instance, and "send" vs "list
+  failed" are genuinely different response shapes off the same base
+  resource. Matches "one endpoint class per resource" from the
+  endpoint-object-pattern skill.
+- **T9**: gitignored `allure-results/` — generated output from T7/T8's
+  `allure-rest-assured` filter appearing under `api/` the first time tests
+  ran with it wired in; not something to commit.
+- **T10**: per-test datafaker seeds are derived as
+  `datafakerSeed ^ testMethodName.hashCode()` (via `TestInfo`), not a shared
+  `AtomicLong` counter or one reused seed. A shared counter would be static
+  mutable state (banned outright); one reused seed across all tests would
+  make every test's `NotificationRequests.valid()` draw the *same* fake
+  recipient on its first call (identical `Random` seed ⇒ identical first
+  draw), which is bad test-data hygiene even though the service doesn't
+  currently dedup on it. The XOR-with-test-name derivation stays
+  deterministic per test (reproducible from the logged base seed + the
+  test's own name) while guaranteeing different tests get different data,
+  with zero shared state.
+- **T10**: live-suite gating implemented via `<groups>`/`<excludedGroups>`
+  Surefire properties (default: exclude `live`) overridden by a `live`
+  Maven profile activated by the presence of `-DrunLive=true` — the "Maven
+  profile" option from amendment 1's two suggested approaches, over
+  `@EnabledIf`.
+- **T11**: notification-service startup instructions in
+  `template/README.md` use the exact steps the user provided (clone
+  `UseYourActive/Notification-Microservice`, `.env.example` → `.env` with
+  placeholder credentials, `docker-compose up -d --build`, verify via
+  `/q/health/ready`).
