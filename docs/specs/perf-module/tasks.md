@@ -2,7 +2,7 @@
 
 - [x] T1: Scaffold `perf` module, wire into the reactor, prove it's execution-safe — files: `pom.xml` (root: `+module`, `gatling.version=3.15.1`, `gatling-maven-plugin.version=4.21.8` properties, dependencyManagement entry for `io.gatling.highcharts:gatling-charts-highcharts`, pluginManagement entry for `io.gatling:gatling-maven-plugin`), `perf/pom.xml` (deps: `qa-commons-core`, `qa-commons-template`, `gatling-charts-highcharts`, `logback-classic`, `junit-jupiter`, `assertj-core` — all `test` scope; `gatling-maven-plugin` declared in `<build><plugins>` with no `<executions>`), `perf/src/test/resources/gatling.conf`, `perf/src/test/resources/logback-test.xml` — done when: `mvn clean verify` from repo root is green with 4 modules in the reactor and the build log shows no Gatling simulation run; after `mvn install -pl perf -am -DskipTests`, `mvn -pl perf gatling:test` (no simulation classes exist yet, no `-am`) fails cleanly, scoped to `qa-commons-perf` only, with Gatling's "No simulations to run" message — proving the plugin is reachable on demand and not auto-bound.
 
-- [ ] T2: protocol — `NotificationServiceProtocol` safety-guard + unit test — files: `perf/src/test/java/dev/qacommons/perf/protocol/NotificationServiceProtocol.java`, `perf/src/test/java/dev/qacommons/perf/protocol/NotificationServiceProtocolTest.java` — done when: `mvn -pl perf test` passes, covering (a) `QA_BASE_URL` set → used verbatim, no probe called, (b) unset + probe reports reachable → `http://localhost:8080` used, WARN logged, (c) unset + probe reports unreachable → `IllegalStateException` naming both conditions; `mvn clean verify` from root stays green.
+- [x] T2: protocol — `NotificationServiceProtocol` safety-guard + unit test — files: `perf/src/test/java/dev/qacommons/perf/protocol/NotificationServiceProtocol.java`, `perf/src/test/java/dev/qacommons/perf/protocol/NotificationServiceProtocolTest.java` — done when: `mvn -pl perf test` passes, covering (a) `QA_BASE_URL` set → used verbatim, no probe called, (b) unset + probe reports reachable → `http://localhost:8080` used, WARN logged, (c) unset + probe reports unreachable → `IllegalStateException` naming both conditions; `mvn clean verify` from root stays green.
 
 - [ ] T3: steps — `NotificationSteps.sendNotification()` reusing template's models — files: `perf/src/test/java/dev/qacommons/perf/steps/NotificationSteps.java` — done when: `mvn -pl perf test-compile` succeeds; the file's only `dev.qacommons.template.*` imports are `CreateNotificationRequest`/model types (no duplicated record), body serialization goes through `core`'s `JsonMapperFactory.newMapper()`, and the check asserts `status().is(202)` + `jmesPath("notificationId").exists()`.
 
@@ -50,3 +50,12 @@
   via a real lifecycle phase where `-am` behaves normally (`mvn install -pl
   perf -am -DskipTests`), then invoke `gatling:test` scoped to `perf` alone
   with no `-am`.
+- **T2**: discovered `NotificationServiceProtocol.httpProtocol()` can't be
+  unit-tested directly - touching Gatling's `http` DSL singleton outside a
+  Gatling-run `Simulation` throws `IllegalStateException: Simulations can't
+  be instantiated directly but only by Gatling` (Gatling's own
+  `HttpDsl` static initializer enforces this). Dropped the one test method
+  that called `httpProtocol(lookup, probe)`; kept the four covering
+  `resolveBaseUrl(...)` (pure logic, no Gatling types touched), which is
+  exactly the scope the approved plan called for. `httpProtocol()`'s actual
+  wiring is exercised for real in T6's `SmokeSimulation` run instead.

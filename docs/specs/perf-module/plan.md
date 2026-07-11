@@ -124,10 +124,20 @@ Non-goals:
      Unreachable → throw `IllegalStateException` with a message naming both
      missing conditions (env var unset, localhost not listening) — Gatling's
      `setUp()` never runs, no load is ever injected against a guessed host.
-  3. A package-private overload takes the env lookup function and the
-     reachability probe as explicit parameters (same seam pattern as
-     `QaConfig`), so the branching logic is unit-testable without a real
-     socket or real env var.
+  3. A package-private `resolveBaseUrl(...)` overload takes the env lookup
+     function and the reachability probe as explicit parameters (same seam
+     pattern as `QaConfig`), so the branching logic is unit-testable without
+     a real socket or real env var.
+- **Verified during T2**: `httpProtocol()`/`httpProtocol(lookup, probe)`
+  themselves are *not* unit-testable - touching Gatling's `http` DSL
+  singleton outside a Gatling-run `Simulation` throws `IllegalStateException:
+  Simulations can't be instantiated directly but only by Gatling` from
+  `HttpDsl`'s own static initializer. `NotificationServiceProtocolTest`
+  therefore covers `resolveBaseUrl(...)` only (pure logic, no Gatling
+  types touched) - exactly the "lookup/probe seam" scope the Risks section
+  called for, not a broader scope creep. `httpProtocol()`'s wiring of that
+  resolved URL into an actual `HttpProtocolBuilder` is exercised for real
+  by `SmokeSimulation` in T6.
 - Deliberately does **not** reuse `QaConfig.fromEnv()` directly: that method
   always substitutes `DEFAULT_BASE_URL` when the env var is unset and gives
   the caller no way to distinguish "explicitly configured" from "defaulted,"
