@@ -6,7 +6,7 @@
 
 - [x] T3: core — `JsonMapperFactory` — files: `core/pom.xml` (+jackson-bom import, databind, jsr310), `core/src/main/java/dev/qacommons/core/json/JsonMapperFactory.java`, test — done when: `mvn -pl core test` passes; a test round-trips a record with an `Instant`/`UUID` field and asserts two `newMapper()` calls return distinct, independently-mutable instances.
 
-- [ ] T4: core — `SeededFaker` base + seed logging — files: `core/pom.xml` (+datafaker), `core/src/main/java/dev/qacommons/core/testdata/SeededFaker.java`, test — done when: `mvn -pl core test` passes; test asserts same seed → same generated sequence, different seeds → different sequences, and that the seed is logged at INFO on construction.
+- [x] T4: core — `SeededFaker` base + seed logging — files: `core/pom.xml` (+datafaker), `core/src/main/java/dev/qacommons/core/testdata/SeededFaker.java`, test — done when: `mvn -pl core test` passes; test asserts same seed → same generated sequence, different seeds → different sequences, and that the seed is logged at INFO on construction.
 
 - [ ] T5: core — AssertJ soft-assertion convention (docs + example, no new prod class) — files: `core/pom.xml` (+assertj-core, compile scope), `core/src/test/java/dev/qacommons/core/conventions/SoftAssertionConventionExampleTest.java`, `core/README.md` — done when: `mvn -pl core test` passes including the example test; README shows the copy-pasteable `@InjectSoftAssertions` pattern.
 
