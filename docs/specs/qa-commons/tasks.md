@@ -4,7 +4,7 @@
 
 - [x] T2: core — `QaConfig` env-based config record — files: `core/pom.xml` (+slf4j), `core/src/main/java/dev/qacommons/core/config/QaConfig.java`, `core/src/test/java/dev/qacommons/core/config/QaConfigTest.java` — done when: `mvn -pl core test` passes; tests cover default values, override via the `fromEnv(Function<String,String>)` seam, and the `QA_BASE_URL` default of `http://localhost:8080`.
 
-- [ ] T3: core — `JsonMapperFactory` — files: `core/pom.xml` (+jackson-bom import, databind, jsr310), `core/src/main/java/dev/qacommons/core/json/JsonMapperFactory.java`, test — done when: `mvn -pl core test` passes; a test round-trips a record with an `Instant`/`UUID` field and asserts two `newMapper()` calls return distinct, independently-mutable instances.
+- [x] T3: core — `JsonMapperFactory` — files: `core/pom.xml` (+jackson-bom import, databind, jsr310), `core/src/main/java/dev/qacommons/core/json/JsonMapperFactory.java`, test — done when: `mvn -pl core test` passes; a test round-trips a record with an `Instant`/`UUID` field and asserts two `newMapper()` calls return distinct, independently-mutable instances.
 
 - [ ] T4: core — `SeededFaker` base + seed logging — files: `core/pom.xml` (+datafaker), `core/src/main/java/dev/qacommons/core/testdata/SeededFaker.java`, test — done when: `mvn -pl core test` passes; test asserts same seed → same generated sequence, different seeds → different sequences, and that the seed is logged at INFO on construction.
 
