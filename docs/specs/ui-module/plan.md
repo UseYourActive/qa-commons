@@ -138,15 +138,56 @@ run it yet.
 
 Implements `ParameterResolver`, `BeforeEachCallback`, `AfterEachCallback`.
 Every method below was checked against the real Playwright 1.61.0 and JUnit
-Jupiter 5.13.4 jars (`javap`), not assumed:
+Jupiter 5.13.4 jars (`javap`), not assumed.
 
-- **Browser, once per JVM**: `context.getRoot().getStore(Namespace.GLOBAL)
-  .getOrComputeIfAbsent(...)`, storing a `CloseableResource` that wraps both
-  the `Playwright` instance and the launched `Browser`
-  (`BrowserType.LaunchOptions().setHeadless(...)`). `getOrComputeIfAbsent`
-  is JUnit 5's documented thread-safe, create-once primitive - the standard
-  idiom for a JVM-scoped resource shared safely across parallel test
-  classes; JUnit closes it exactly once, at test-plan shutdown.
+**Correction made during T2, replacing the "one Browser per JVM" line in
+the original mission text and first draft of this plan**: a literal single
+`Browser` instance shared across every parallel worker thread is not just
+suboptimal, it's **unsafe** - Playwright's own Java docs are explicit that
+"Playwright Java is not thread safe... all its methods as well as methods
+on all objects created by it (Browser, BrowserContext, Page, etc.) are
+expected to be called on the same thread where the Playwright object was
+created." This was proven, not just read: the first implementation (one
+`Browser` in the root `ExtensionContext.Store`, called concurrently from
+every worker thread) produced real protocol-corruption errors ("Object
+doesn't exist: browser-context@...", "Cannot find object to call
+__adopt__") the moment `ui`'s own concurrent `junit-platform.properties`
+(copied from `template`, `mode.default=concurrent`) actually ran multiple
+test methods in parallel. This is exactly the "must not flake" risk the
+mission called out - it did, immediately, under real concurrency.
+
+Checked Playwright's own official JUnit 5 integration source
+(`com.microsoft.playwright.impl.junit.PlaywrightExtension` /
+`BrowserExtension` in `microsoft/playwright-java`) for the sanctioned
+pattern rather than inventing one: **one `Playwright`/`Browser` per
+thread**, via `ThreadLocal`, reused across every test that thread happens
+to run - not one per JVM, not one per test. Their own cleanup
+(`AfterAllCallback`, closing the thread-local browser when a test class
+finishes) is safe *only* under their recommended `mode.default=same_thread`
++ `mode.classes.default=concurrent` config (class-level parallelism only) -
+it doesn't fit here, because `afterAll()` isn't guaranteed to execute on
+the same thread that ran that class's methods once method-level
+concurrency is in play, which is this repo's own established convention.
+Adapted instead of copied outright:
+
+- **Browser, one per worker thread**: a `ThreadLocal<BrowserHandle>` (each
+  handle wrapping one `Playwright` + one launched `Browser`), created
+  lazily on that thread's first test and reused for every subsequent test
+  the same pooled thread picks up - still "created once, not per test," just
+  scoped to "per thread" rather than "per JVM" since per-JVM sharing is
+  what Playwright's own thread-confinement rule rules out.
+- **Cleanup, exactly once for the whole run**: every created
+  `BrowserHandle` registers itself into a synchronized list held by a
+  single registry object stored in the *root* `ExtensionContext.Store` as a
+  real `Store.CloseableResource` (`context.getRoot().getStore(...)
+  .getOrComputeIfAbsent(...)`) - JUnit closes this exactly once, at
+  test-plan shutdown, regardless of which thread triggers it. This is
+  deliberately different from Microsoft's per-class `afterAll()` teardown:
+  under method-level concurrency there's no single thread guaranteed to
+  "own" a class's cleanup, so closing per-thread-registered handles once,
+  globally, at the very end is the only version of this that's actually
+  correct for `concurrent`-mode methods, not just `concurrent`-mode
+  classes.
 - **Context + Page, once per test**: `beforeEach` creates a fresh
   `BrowserContext` and `Page`, stored in the *per-test* `Store` (namespaced
   to that test's own `ExtensionContext` - inherently non-shared under
@@ -324,14 +365,50 @@ whether the notification service is up.
 
 The remaining real risk - a fresh clone with **no Playwright browser
 binaries installed yet** would otherwise hard-fail even these local-page
-unit tests - is handled with `Assumptions.assumeTrue(...)` at the top of
-each: if launching the browser throws Playwright's own "browser executable
-doesn't exist" error, the test **skips** (reported, not silently green,
-not a hard failure). This mirrors the well-established Testcontainers idiom
-of skipping gracefully when Docker isn't available. `mvn clean verify` is
-green either way - skipped on a fresh clone, genuinely executed (and still
-requiring no external service) once the one-time install command has been
-run.
+unit tests - is handled with a graceful skip. **Where this check actually
+lives matters and was corrected during T2**: the browser is launched inside
+`PlaywrightExtension.beforeEach` (building the shared JVM-scoped `Browser`
+on first use), which runs *before* the test method body at all - a
+`PlaywrightException` thrown there is an extension failure, not something a
+`try/catch` inside the test method could ever observe or convert. So the
+graceful-skip logic lives in `PlaywrightExtension` itself: `beforeEach`
+catches `PlaywrightException` around browser creation and calls
+`Assumptions.assumeTrue(false, message)`, which throws
+`TestAbortedException` - JUnit 5 extensions are explicitly allowed to abort
+a test this way from `beforeEach`, and JUnit reports it as **skipped**, not
+failed. This centralizes the behavior once, in the extension, rather than
+requiring every test author to remember to wrap their own test body -
+strictly better than the original per-test-method sketch, not just a
+different way to reach the same outcome. This mirrors the well-established
+Testcontainers idiom of skipping gracefully when Docker isn't available.
+`mvn clean verify` is green either way - the whole browser-dependent test
+skips on a fresh clone, and genuinely executes (still requiring no external
+service) once the one-time install command has been run.
+
+**Two more corrections made empirically during T2, not assumed**:
+
+1. Hiding the installed browsers and running the unit tests didn't produce
+   a clean `PlaywrightException` at all at first - it silently
+   auto-downloaded a fresh copy of every browser (Chromium, Firefox,
+   WebKit, ~300MB) and took **3 minutes** instead of throwing. This is real
+   Playwright Java behavior (confirmed via `microsoft/playwright-java#418`
+   and Playwright's own env-var docs), not a bug in this design, but it
+   directly violates "documented AND automated sensibly, not assumed
+   present" - a silent multi-minute background download inside what's
+   supposed to be a fast local unit test is exactly the surprise that
+   requirement rules out. Fixed by passing
+   `Playwright.CreateOptions().setEnv(Map.of("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "1"))`
+   to `Playwright.create(...)` in `BrowserHandle`'s constructor - verified
+   empirically (browsers hidden again, same test suite) that this restores
+   the fast, clean `PlaywrightException` → graceful-skip path (2.7s,
+   `Skipped: 11`) instead of the silent download.
+2. `Assumptions.assumeTrue(false, ...)` inside `beforeEach` throws
+   `TestAbortedException`, but JUnit 5 still calls `afterEach` afterward for
+   cleanup symmetry - confirmed the hard way with a `NullPointerException`
+   on `browserContext.close()` when `afterEach` ran after a skipped
+   `beforeEach` that never populated the per-test store. Fixed with an
+   early return in `afterEach` when no `BrowserContext` was ever stored for
+   that test.
 
 **Loud skips (amendment)**: the `assumeTrue` message is not a generic
 "browsers not installed" - it includes the exact, copy-pasteable command
