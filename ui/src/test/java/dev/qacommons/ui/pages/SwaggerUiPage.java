@@ -1,0 +1,52 @@
+package dev.qacommons.ui.pages;
+
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.AriaRole;
+import dev.qacommons.ui.BasePage;
+import java.util.regex.Pattern;
+
+/**
+ * Quarkus's built-in Swagger UI ({@code /q/swagger-ui}). Locators are
+ * role-first per the ui-automation-patterns skill and verified against the
+ * real rendered page (not assumed): tag section names are real {@code <a>}
+ * elements (role {@code link}), each operation's clickable summary is a
+ * real {@code <button aria-expanded>} (role {@code button}), and the
+ * "Schema"/"Example Value" toggle after expanding is a real {@code role=tab}
+ * pair. No CSS/XPath fallback was needed anywhere in this page object.
+ */
+public final class SwaggerUiPage extends BasePage {
+
+    public SwaggerUiPage(Page page) {
+        super(page);
+    }
+
+    public SwaggerUiPage open(String baseUrl) {
+        page.navigate(baseUrl + "/q/swagger-ui");
+        // Swagger UI is a client-rendered app - zero role=link elements
+        // exist in the initial HTML shell (verified empirically), so
+        // waiting for the first one is a reliable "the spec has actually
+        // rendered" signal, not a guess at an arbitrary timeout.
+        page.getByRole(AriaRole.LINK).first().waitFor();
+        return this;
+    }
+
+    /**
+     * Whether a tag section with exactly this name (e.g. "Notification
+     * Delivery") is present - the contract-shape check the live tests
+     * assert on, not a full endpoint-by-endpoint pixel comparison.
+     */
+    public boolean hasEndpointGroup(String tagName) {
+        return page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName(tagName).setExact(true)).count() > 0;
+    }
+
+    /**
+     * Locates one operation by a fragment of its summary text (e.g. "Send a
+     * notification") - the button's full accessible name also includes the
+     * HTTP method and path, so this matches a substring rather than
+     * requiring the exact concatenation.
+     */
+    public OperationRow operation(String summaryTextFragment) {
+        return new OperationRow(page, page.getByRole(AriaRole.BUTTON,
+                new Page.GetByRoleOptions().setName(Pattern.compile(Pattern.quote(summaryTextFragment)))));
+    }
+}

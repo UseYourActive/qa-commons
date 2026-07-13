@@ -320,8 +320,11 @@ repo already pins):
 ### Template proof (`ui/src/test/java`, mirrors `perf`'s self-contained pattern)
 
 - `dev.qacommons.ui.pages.SwaggerUiPage extends BasePage` -
-  `open(String baseUrl)` (navigates, returns `this`), `endpointTagNames()`
-  (read), `operation(String summaryTextFragment)` (returns an
+  `open(String baseUrl)` (navigates, returns `this`), `hasEndpointGroup(String
+  tagName)` (read - simpler than an earlier "list all tags" sketch: a
+  boolean presence check is all the planned tests actually need, and it
+  stays purely role-based with no CSS scoping needed to bulk-collect every
+  tag), `operation(String summaryTextFragment)` (returns an
   `OperationRow`).
 - `dev.qacommons.ui.pages.OperationRow` - composed fragment, not inherited;
   `expand()` (action, returns `this`), `schemaTabVisible()` (read).
