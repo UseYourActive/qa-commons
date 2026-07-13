@@ -42,6 +42,13 @@ class UiSoftAssertionsTest {
 
     @Test
     void screenshotsAtTheMomentOfEachSoftAssertionFailure_notJustAtTestEnd(Page page) throws IOException {
+        // Stale files from earlier `mvn test` runs (without an intervening
+        // `clean`) share this test's id prefix but a different sequence
+        // suffix - clear them first so the count below reflects only what
+        // this run produces, not every run since the last `mvn clean`.
+        deleteMatching("playwright-screenshots",
+                "UiSoftAssertionsTest-screenshotsAtTheMomentOfEachSoftAssertionFailure*.png");
+
         page.navigate("data:text/html,<title>soft-assert-test</title>");
         UiSoftAssertions softly = new UiSoftAssertions();
 
@@ -73,5 +80,17 @@ class UiSoftAssertionsTest {
             }
         }
         return count;
+    }
+
+    private static void deleteMatching(String subdir, String glob) throws IOException {
+        Path dir = Paths.get("target", subdir);
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, glob)) {
+            for (Path file : stream) {
+                Files.delete(file);
+            }
+        }
     }
 }

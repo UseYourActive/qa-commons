@@ -1,6 +1,7 @@
 package dev.qacommons.ui.pages;
 
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.AriaRole;
 import dev.qacommons.ui.BasePage;
 
@@ -33,9 +34,24 @@ public final class SwaggerUiPage extends BasePage {
      * Whether a tag section with exactly this name (e.g. "Notification
      * Delivery") is present - the contract-shape check the live tests
      * assert on, not a full endpoint-by-endpoint pixel comparison.
+     *
+     * <p>Uses {@code waitFor()}, not {@code count()}: {@code count()} is a
+     * one-shot, non-retrying query - it happened to "work" in headless mode
+     * purely because rendering was fast enough to already be done by the
+     * time it ran, then failed under headed mode's slower real-window
+     * rendering (found running the live suite with {@code QA_UI_HEADED=true}
+     * during T7). {@code waitFor()} is Playwright's real auto-waiting
+     * primitive, matching the skill's "no manual waits - built-in
+     * auto-waiting covers existence/visibility" rule properly instead of by
+     * accident.
      */
     public boolean hasEndpointGroup(String tagName) {
-        return page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName(tagName).setExact(true)).count() > 0;
+        try {
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions().setName(tagName).setExact(true)).first().waitFor();
+            return true;
+        } catch (TimeoutError e) {
+            return false;
+        }
     }
 
     /**

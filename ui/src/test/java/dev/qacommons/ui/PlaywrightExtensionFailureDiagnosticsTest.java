@@ -47,6 +47,13 @@ class PlaywrightExtensionFailureDiagnosticsTest {
 
     @Test
     void hardFailure_capturesTraceAndScreenshot() throws IOException {
+        // Stale files from earlier `mvn test` runs (without an intervening
+        // `clean`) share this test's id prefix but a different sequence
+        // suffix - clear them first so the count below reflects only what
+        // this run produces, not every run since the last `mvn clean`.
+        deleteMatching("playwright-traces", "FailingCase-hardFailure*.zip");
+        deleteMatching("playwright-screenshots", "FailingCase-hardFailure*.png");
+
         TestExecutionSummary summary = runClass(FailingCase.class);
 
         assertThat(summary.getTotalFailureCount()).isEqualTo(1);
@@ -56,6 +63,9 @@ class PlaywrightExtensionFailureDiagnosticsTest {
 
     @Test
     void passingTest_capturesNoArtifacts() throws IOException {
+        deleteMatching("playwright-traces", "PassingCase-passes*.zip");
+        deleteMatching("playwright-screenshots", "PassingCase-passes*.png");
+
         TestExecutionSummary summary = runClass(PassingCase.class);
 
         assertThat(summary.getTotalFailureCount()).isEqualTo(0);
@@ -86,5 +96,17 @@ class PlaywrightExtensionFailureDiagnosticsTest {
             }
         }
         return count;
+    }
+
+    private static void deleteMatching(String subdir, String glob) throws IOException {
+        Path dir = Paths.get("target", subdir);
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, glob)) {
+            for (Path file : stream) {
+                Files.delete(file);
+            }
+        }
     }
 }

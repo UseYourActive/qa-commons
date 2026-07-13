@@ -477,6 +477,33 @@ yet, rather than mistaking a skip for a pass.
   this one: whether the live suite should ever run Firefox/WebKit too. Not
   blocking; the install command already supports it (`install firefox
   webkit`) whenever it's wanted.
+- **Real correctness bug found during T7's headed-mode check, not just a
+  headed-mode quirk**: `SwaggerUiPage.hasEndpointGroup` used
+  `Locator.count()` and `OperationRow.schemaTabVisible` used
+  `Locator.isVisible()` - both one-shot, non-retrying queries, not
+  Playwright's actual auto-waiting mechanism. This happened to pass in
+  headless mode purely because rendering was fast enough to already be
+  complete by the time the check ran; running the exact same live suite
+  with `QA_UI_HEADED=true` (real window, slower real rendering) made
+  `hasEndpointGroup` fail outright - the "Notification Delivery" link
+  hadn't rendered yet at the instant `count()` was called. This is exactly
+  the anti-pattern the ui-automation-patterns skill rules out ("write NO
+  manual waits - built-in auto-waiting covers existence/visibility");
+  it was accidentally correct in one mode and wrong in the other, not
+  correctly designed in either. Fixed by switching both methods to
+  `Locator.waitFor()` (catching `TimeoutError` to produce the boolean
+  `false` case) - Playwright's real auto-retrying primitive. Verified: the
+  identical live suite now passes in both headless and headed mode.
+- **Fixed during T7**: `UiSoftAssertionsTest` and
+  `PlaywrightExtensionFailureDiagnosticsTest`'s artifact-count assertions
+  were fragile against repeated `mvn test` runs without an intervening
+  `clean` - the shared `ARTIFACT_SEQUENCE` counter resets to 1 each fresh
+  JVM, but different runs still produce differently-suffixed files (e.g.
+  `-1.png` one run, `-3.png` the next, depending on what else ran first),
+  so old runs' files never get overwritten and a glob-based count picks up
+  all of them. A real test-fragility bug, not a production one - fixed by
+  deleting matching files before each assertion; verified by running the
+  full `ui` suite twice back-to-back with no `clean` between runs.
 - **Observed, not blocking**: under this repo's concurrent test config,
   Maven Surefire's per-class XML report files sometimes attribute a test
   case to the wrong class (`TEST-UiSoftAssertionsTest.xml` containing

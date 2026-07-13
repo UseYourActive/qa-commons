@@ -2,6 +2,7 @@ package dev.qacommons.ui.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.TimeoutError;
 import com.microsoft.playwright.options.AriaRole;
 
 /**
@@ -27,8 +28,18 @@ public final class OperationRow {
     /**
      * Whether the "Schema" tab is showing for this (already expanded)
      * operation - the contract-shape check the live tests assert on.
+     *
+     * <p>Uses {@code waitFor()}, not {@code isVisible()}: {@code
+     * isVisible()} is a one-shot, non-retrying query, the same anti-pattern
+     * that broke {@link SwaggerUiPage#hasEndpointGroup} under headed mode -
+     * see that method's Javadoc for how this was found.
      */
     public boolean schemaTabVisible() {
-        return page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Schema")).first().isVisible();
+        try {
+            page.getByRole(AriaRole.TAB, new Page.GetByRoleOptions().setName("Schema")).first().waitFor();
+            return true;
+        } catch (TimeoutError e) {
+            return false;
+        }
     }
 }
