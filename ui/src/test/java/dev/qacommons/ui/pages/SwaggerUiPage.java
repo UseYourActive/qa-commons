@@ -3,7 +3,6 @@ package dev.qacommons.ui.pages;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.AriaRole;
 import dev.qacommons.ui.BasePage;
-import java.util.regex.Pattern;
 
 /**
  * Quarkus's built-in Swagger UI ({@code /q/swagger-ui}). Locators are
@@ -42,11 +41,21 @@ public final class SwaggerUiPage extends BasePage {
     /**
      * Locates one operation by a fragment of its summary text (e.g. "Send a
      * notification") - the button's full accessible name also includes the
-     * HTTP method and path, so this matches a substring rather than
-     * requiring the exact concatenation.
+     * HTTP method and path, so this relies on {@code setName(String)}'s
+     * substring-by-default matching rather than requiring the exact
+     * concatenation.
+     *
+     * <p>Deliberately a plain {@code String}, not a compiled {@link
+     * java.util.regex.Pattern}: verified empirically that Playwright's Java
+     * bindings' {@code setName(Pattern)} does *not* do the substring match
+     * its JS/Node equivalent does (a bare {@code Pattern.quote(...)} match
+     * against this same button returned zero results), while the {@code
+     * String} overload's documented substring-by-default behavior worked
+     * correctly. Not assumed - directly reproduced and compared both ways
+     * against the real page before choosing this.
      */
     public OperationRow operation(String summaryTextFragment) {
-        return new OperationRow(page, page.getByRole(AriaRole.BUTTON,
-                new Page.GetByRoleOptions().setName(Pattern.compile(Pattern.quote(summaryTextFragment)))));
+        return new OperationRow(page,
+                page.getByRole(AriaRole.BUTTON, new Page.GetByRoleOptions().setName(summaryTextFragment)));
     }
 }

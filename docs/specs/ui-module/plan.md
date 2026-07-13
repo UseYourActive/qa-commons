@@ -316,6 +316,21 @@ repo already pins):
     DOM turned out to be fully role-navigable. If a future page object
     needs a CSS/XPath fallback, the skill's rule (last resort, with a
     comment explaining why) applies then.
+  - **Correction found running the real live suite (T6)**: the original
+    `operation(String)` sketch used
+    `setName(Pattern.compile(Pattern.quote(fragment)))` for substring
+    matching, copying the JS/Node convention where a bare regex literal
+    (e.g. `/Send a notification/`) matches as a substring. Both live tests
+    that expand an operation timed out - 30s, every time, isolated to a
+    single test with no concurrency involved. A side-by-side probe against
+    the real page (`Pattern` vs plain `String`, same button, same page)
+    showed `setName(Pattern)` returning **zero** matches while
+    `setName(String)` returned exactly one, confirming Playwright's Java
+    bindings don't extend the JS convention to `Pattern`-based name
+    matching the way it first appeared they should. Fixed by using the
+    `String` overload directly (which already does substring matching by
+    default - no `Pattern`/`Pattern.quote` needed at all, simpler code as
+    well as correct).
 
 ### Template proof (`ui/src/test/java`, mirrors `perf`'s self-contained pattern)
 
