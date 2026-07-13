@@ -459,3 +459,15 @@ yet, rather than mistaking a skip for a pass.
   this one: whether the live suite should ever run Firefox/WebKit too. Not
   blocking; the install command already supports it (`install firefox
   webkit`) whenever it's wanted.
+- **Observed, not blocking**: under this repo's concurrent test config,
+  Maven Surefire's per-class XML report files sometimes attribute a test
+  case to the wrong class (`TEST-UiSoftAssertionsTest.xml` containing
+  `<testcase classname="PlaywrightExtensionTest">` entries alongside its
+  own). Confirmed this is a report-writing artifact, not a real execution
+  problem: every individual test genuinely ran and passed, and the
+  aggregate reactor-level `Tests run: N, Failures: 0, Errors: 0` / exit
+  code (what actually gates `mvn clean verify` and CI) stayed accurate
+  throughout. Pre-existing Surefire/JUnit5-under-concurrency behavior, not
+  something introduced by this module - out of scope to fix here, but
+  worth knowing if a future reader trusts a single per-class XML file in
+  isolation.

@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -69,9 +70,34 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
     private static final ThreadLocal<BrowserHandle> THREAD_BROWSER = new ThreadLocal<>();
 
     private static final ThreadLocal<Page> CURRENT_PAGE = new ThreadLocal<>();
+    private static final ThreadLocal<String> CURRENT_TEST_ID = new ThreadLocal<>();
+    private static final AtomicInteger ARTIFACT_SEQUENCE = new AtomicInteger();
 
     static Page currentPage() {
         return CURRENT_PAGE.get();
+    }
+
+    /**
+     * Builds a fresh, always-unique path under {@code target/<subdir>/} for
+     * the current test (falling back to the current thread's id if no test
+     * id is bound - e.g. called from outside a {@link PlaywrightExtension}
+     * -managed test). A monotonic sequence number is always appended, not
+     * just the test id: a single {@code @RepeatedTest} produces many
+     * artifacts sharing one test id, and without the sequence they would
+     * silently overwrite each other.
+     */
+    static Path newArtifactPath(String subdir, String suffix) {
+        String testId = CURRENT_TEST_ID.get();
+        if (testId == null) {
+            testId = "unbound-thread-" + Thread.currentThread().threadId();
+        }
+        Path dir = Paths.get("target", subdir);
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to create artifact directory: " + dir, e);
+        }
+        return dir.resolve(testId + "-" + ARTIFACT_SEQUENCE.incrementAndGet() + suffix);
     }
 
     @Override
@@ -102,6 +128,8 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
         store.put(CONTEXT_KEY, browserContext);
         store.put(PAGE_KEY, page);
         CURRENT_PAGE.set(page);
+        CURRENT_TEST_ID.set(context.getRequiredTestClass().getSimpleName() + "-"
+                + context.getRequiredTestMethod().getName());
     }
 
     @Override
@@ -121,11 +149,11 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
 
         try {
             if (failed) {
-                Path tracePath = artifactPath("playwright-traces", context, ".zip");
+                Path tracePath = newArtifactPath("playwright-traces", ".zip");
                 browserContext.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
                 LOGGER.error("Test failed - trace saved to {}", tracePath.toAbsolutePath());
 
-                Path screenshotPath = artifactPath("playwright-screenshots", context, ".png");
+                Path screenshotPath = newArtifactPath("playwright-screenshots", ".png");
                 page.screenshot(new Page.ScreenshotOptions().setPath(screenshotPath));
                 LOGGER.error("Test failed - screenshot saved to {}", screenshotPath.toAbsolutePath());
             } else {
@@ -134,6 +162,7 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
         } finally {
             browserContext.close();
             CURRENT_PAGE.remove();
+            CURRENT_TEST_ID.remove();
         }
     }
 
@@ -160,18 +189,6 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
     private static BrowserRegistry registry(ExtensionContext context) {
         Store rootStore = context.getRoot().getStore(REGISTRY_NAMESPACE);
         return rootStore.getOrComputeIfAbsent(REGISTRY_KEY, key -> new BrowserRegistry(), BrowserRegistry.class);
-    }
-
-    static Path artifactPath(String subdir, ExtensionContext context, String suffix) {
-        String testId = context.getRequiredTestClass().getSimpleName() + "-"
-                + context.getRequiredTestMethod().getName();
-        Path dir = Paths.get("target", subdir);
-        try {
-            Files.createDirectories(dir);
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to create artifact directory: " + dir, e);
-        }
-        return dir.resolve(testId + suffix);
     }
 
     private static final class BrowserHandle {
