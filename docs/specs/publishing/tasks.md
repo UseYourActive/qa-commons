@@ -35,25 +35,32 @@
 
 - [x] T6: consumption proof in the notification service repo — files: in
   `C:\Users\alexo\IdeaProjects\notification`, on branch
-  `feature/qa-commons-consumer-proof` (commit `8b93022`, local-only — not
-  pushed, no upstream tracking). Done: `pom.xml` gets the JitPack repository
-  plus one test-scope `qa-commons-api:v0.1.0` dependency; new package
+  `feature/qa-commons-consumer-proof` (commit `cada7a8`, **pushed** for PR
+  review — https://github.com/UseYourActive/Notification-Microservice/pull/new/feature/qa-commons-consumer-proof).
+  Done: `pom.xml` gets the JitPack repository plus one test-scope
+  `qa-commons-api:v0.1.0` dependency; new package
   `bg.sit_varna.sit.si.qacommons` holds `ChannelsEndpoint` (real `Endpoint`
   subclass over the service's own `GetChannelsResponse`/`ErrorResponse`
   DTOs) and `ChannelsQaCommonsConsumptionTest` (one `@Test`, asserts on
   `ApiResult`). No existing testkit file touched. Ran against the real
-  service (started via `docker-compose up -d --build` in that repo, health
-  check confirmed `UP`) — `mvn -Dtest=ChannelsQaCommonsConsumptionTest
-  test`: 1 run, 0 failures. Confirmed the jar, and separately the sources
-  jar (via `mvn dependency:sources`), landed in the real `~/.m2/repository`
-  under `com/github/UseYourActive/qa-commons/...v0.1.0`, resolved from
-  JitPack through this consumer repo's own `pom.xml` config — the same path
-  an IDE uses to attach sources. Test tagged `@Tag("live")` for
-  self-documentation; this repo has no existing tag-based Surefire
-  exclusion, so a plain `mvn test` here will fail this one test without the
-  service running — left as-is deliberately (minimal footprint over wiring
-  new build policy into someone else's repo), flagged for the user's
-  review.
+  service (`docker-compose up -d --build`, health check confirmed `UP`).
+  Confirmed the jar, and separately the sources jar (via
+  `mvn dependency:sources`), landed in the real `~/.m2/repository` under
+  `com/github/UseYourActive/qa-commons/...v0.1.0`, resolved from JitPack
+  through this consumer repo's own `pom.xml` config — the same path an IDE
+  uses to attach sources.
+
+  **Gating amendment, folded into the same commit** (this is the repo's
+  first `@Tag("live")` test, so the policy lands with it, not as a
+  follow-up): added `groups`/`excludedGroups` properties, wired them into
+  the existing `maven-surefire-plugin` config, and a `live` profile
+  (`-DrunLive=true`) — an exact mirror of qa-commons's own `template/pom.xml`
+  pattern. One-line README note in "Testing & Validation". Verified both
+  directions for real: service stopped (`docker-compose down`), plain
+  `mvn test` — 163 tests, 0 failures, the live test not run at all; service
+  restarted and confirmed healthy, `mvn test -DrunLive=true` — 1 test run
+  (only the live-tagged one, matching the `groups=live` semantics), 0
+  failures.
 
 - [x] T7: full reactor + safety re-verification — done: fresh
   `mvn clean verify` from the qa-commons repo root — `BUILD SUCCESS` across
