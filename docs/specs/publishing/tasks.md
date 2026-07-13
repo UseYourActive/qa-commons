@@ -17,25 +17,20 @@
   minimal `Endpoint` usage example), and the existing Modules/Build sections
   are otherwise unchanged.
 
-- [ ] T4: tag and push v0.1.0 — files: none (git only) — **blocked: wait
-  until `feature/publishing` is reviewed and merged into `main`; tags are
-  cut on `main` only, per the amendment in plan.md.** Done when: `git tag
-  v0.1.0` exists locally, pushed to `origin`, pointing at a commit on
-  `main`.
+- [x] T4: tag and push v0.1.0 — files: none (git only) — done: tagged and
+  pushed at `c1515d4` (the `feature/publishing` merge commit) on `main`.
 
-- [ ] T5: verify the real JitPack build for v0.1.0 — files: none
-  (verification only, findings folded back into plan.md's Risks if reality
-  contradicts it) — done when: JitPack's build log for
-  `UseYourActive/qa-commons` tag `v0.1.0` is fetched and confirmed green for
-  all four modules; a sources jar for `qa-commons-core` and
-  `qa-commons-api` is actually resolved via a real Maven fetch (not just
-  seen listed in the build log); and the resolved `qa-commons-api` POM's
-  dependency on `qa-commons-core` points at the `v0.1.0` tag coordinate, not
-  `SNAPSHOT`. If `openjdk21` isn't honored, sources don't actually resolve,
-  or the internal dependency resolves to SNAPSHOT, STOP, update plan.md's
-  Risks with what was actually observed, apply the documented fallback (or
-  report the finding if no fallback covers it), and re-verify before
-  continuing.
+- [x] T5: verify the real JitPack build for v0.1.0 — done: JitPack's build
+  API for `UseYourActive/qa-commons` tag `v0.1.0` reports `status: ok`,
+  `commit: c1515d4...` (matches `main` HEAD exactly), all five artifacts
+  built (`qa-commons`, `qa-commons-api`, `qa-commons-core`,
+  `qa-commons-perf`, `qa-commons-template`). `mvn dependency:get` against a
+  clean scratch local repo actually resolved
+  `qa-commons-core-v0.1.0-sources.jar` and `qa-commons-api-v0.1.0-sources.jar`
+  (not just an HTTP existence check) and both contain real `.java` files.
+  `qa-commons-api`'s resolved POM depends on `qa-commons-core:v0.1.0`, not
+  SNAPSHOT. `openjdk21` was honored with no fallback needed — no plan.md
+  amendment required.
 
 - [ ] T6: consumption proof in the notification service repo — files: in
   `C:\Users\alexo\IdeaProjects\notification`, on branch
