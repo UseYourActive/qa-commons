@@ -15,6 +15,7 @@
   <modules>
     <module>core</module>
     <module>api</module>
+    <module>ui</module>
     <module>template</module>
     <module>perf</module>
   </modules>
@@ -36,6 +37,9 @@
     <gatling-maven-plugin.version>4.21.8</gatling-maven-plugin.version>
     <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+    <!-- Independently-versioned artifacts - not expected to match numerically -->
+    <playwright.version>1.61.0</playwright.version>
+    <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -92,6 +96,11 @@
         <artifactId>gatling-charts-highcharts</artifactId>
         <version>${gatling.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.microsoft.playwright</groupId>
+        <artifactId>playwright</artifactId>
+        <version>${playwright.version}</version>
+      </dependency>
 
       <!-- Internal modules -->
       <dependency>
@@ -102,6 +111,11 @@
       <dependency>
         <groupId>dev.qacommons</groupId>
         <artifactId>qa-commons-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.qacommons</groupId>
+        <artifactId>qa-commons-ui</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -137,6 +151,19 @@
           <groupId>io.gatling</groupId>
           <artifactId>gatling-maven-plugin</artifactId>
           <version>${gatling-maven-plugin.version}</version>
+        </plugin>
+        <!--
+          Declared here for version pinning only. Actual activation lives in
+          ui/pom.xml as a single execution (id "install-browsers") with NO
+          <phase> - confirmed via the plugin's own plugin.xml (the `java`
+          goal declares no default phase), so it's reachable only via
+          `mvn -pl ui exec:java@install-browsers`, never during
+          `mvn clean verify`.
+        -->
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>${exec-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

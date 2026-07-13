@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.qacommons</groupId>
+    <artifactId>qa-commons</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>qa-commons-ui</artifactId>
+  <packaging>jar</packaging>
+
+  <name>qa-commons-ui</name>
+  <description>Playwright for Java lifecycle, Page Object base, and failure diagnostics.</description>
+
+  <properties>
+    <groups></groups>
+    <excludedGroups>live</excludedGroups>
+  </properties>
+
+  <profiles>
+    <profile>
+      <id>live</id>
+      <activation>
+        <property>
+          <name>runLive</name>
+        </property>
+      </activation>
+      <properties>
+        <groups>live</groups>
+        <excludedGroups></excludedGroups>
+      </properties>
+    </profile>
+  </profiles>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.qacommons</groupId>
+      <artifactId>qa-commons-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+    </dependency>
+    <!-- Compile scope, not test - PlaywrightExtension implements JUnit 5
+         extension interfaces from src/main, exactly like assertj-core
+         ships SoftAssertionsExtension in its main jar, not a test jar. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <!-- Compile scope, not test - UiSoftAssertions extends SoftAssertions
+         and lives in src/main. First module in this repo where AssertJ is
+         a main-scope dependency rather than test-only. -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <groups>${groups}</groups>
+          <excludedGroups>${excludedGroups}</excludedGroups>
+        </configuration>
+      </plugin>
+      <!--
+        No <phase> - only reachable via `mvn -pl ui exec:java@install-browsers`.
+        Confirmed via exec-maven-plugin's own plugin.xml: the `java` goal
+        declares no default lifecycle phase, so omitting <phase> here means
+        `mvn clean verify` never triggers a browser download.
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>install-browsers</id>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <configuration>
+              <mainClass>com.microsoft.playwright.CLI</mainClass>
+              <!-- Chromium only, per plan.md's non-goals for this pass -
+                   `install` with no browser argument would also pull
+                   Firefox and WebKit, neither of which this module ever
+                   launches. -->
+              <arguments>
+                <argument>install</argument>
+                <argument>chromium</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
