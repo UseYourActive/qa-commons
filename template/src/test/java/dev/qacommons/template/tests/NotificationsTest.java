@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.qacommons.api.ApiResult;
 import dev.qacommons.core.config.QaConfig;
+import dev.qacommons.core.report.ReportContextExtension;
 import dev.qacommons.template.api.FailedNotificationsEndpoint;
 import dev.qacommons.template.api.NotificationsEndpoint;
 import dev.qacommons.template.model.CreateNotificationRequest;
@@ -15,6 +16,7 @@ import dev.qacommons.template.testdata.NotificationRequests;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * Requires the real notification service running locally - see the root
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.TestInfo;
  * -DrunLive=true}; excluded from the default {@code mvn clean verify}.
  */
 @Tag("live")
+@ExtendWith(ReportContextExtension.class)
 class NotificationsTest {
 
     private QaConfig config() {

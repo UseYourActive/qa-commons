@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.microsoft.playwright.Page;
 import dev.qacommons.core.config.QaConfig;
+import dev.qacommons.core.report.ReportContextExtension;
 import dev.qacommons.ui.PlaywrightExtension;
 import dev.qacommons.ui.pages.OperationRow;
 import dev.qacommons.ui.pages.SwaggerUiPage;
@@ -20,7 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * version bump.
  */
 @Tag("live")
-@ExtendWith(PlaywrightExtension.class)
+@ExtendWith({PlaywrightExtension.class, ReportContextExtension.class})
 class SwaggerUiTest {
 
     private String baseUrl() {

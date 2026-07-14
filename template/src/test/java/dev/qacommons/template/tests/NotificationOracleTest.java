@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.qacommons.api.ApiResult;
 import dev.qacommons.core.config.QaConfig;
+import dev.qacommons.core.report.ReportContextExtension;
 import dev.qacommons.db.config.DbConfig;
 import dev.qacommons.template.api.NotificationsEndpoint;
 import dev.qacommons.template.db.NotificationRow;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * Requires the real notification service (and its Postgres, reachable via
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.TestInfo;
  * returned 202. Run with {@code mvn -pl template test -DrunLive=true}.
  */
 @Tag("live")
+@ExtendWith(ReportContextExtension.class)
 class NotificationOracleTest {
 
     private QaConfig config() {
