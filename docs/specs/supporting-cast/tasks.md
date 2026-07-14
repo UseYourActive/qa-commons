@@ -90,23 +90,39 @@ commit, in order.
   approach) additionally shows a screenshot/trace attachment in that test's raw
   `allure-results` entry, not just a file on disk.
 
-- [ ] T11: `allure-maven` wiring for combined report generation — files: root
-  `pom.xml` (+`allure-maven-plugin.version` property, `pluginManagement` entry
-  with `reportVersion` pinned to `allure-bom.version`, root-only `<build><plugins>`
-  entry with `<inherited>false</inherited>` and `resultsDirectory` pointed at
-  `${project.basedir}/allure-results`), `ui/pom.xml` + `template/pom.xml`
-  (Surefire `systemPropertyVariables` → `allure.results.directory` =
-  `${maven.multiModuleProjectDirectory}/allure-results`) — done when: after
-  `mvn -pl ui,template -am test -DrunLive=true`, both modules' results land in
-  the one shared directory (confirmed by listing it); `mvn clean verify` never
-  triggers `allure:report` (no default-lifecycle binding); `mvn -N allure:report`
-  run once at repo root generates exactly one
-  `target/site/allure-maven-plugin/index.html` and no per-module report
-  anywhere else in the tree; and, separately, a bare `mvn allure:report` (no
-  `-N`) is run once to empirically **prove it is the wrong command** — same
-  gotcha `gatling:test` taught in the `perf` mission — recording here what it
-  actually does (walks every reactor module) so the root README's documented
-  command is the verified `-N` form, not an assumption.
+- [x] T11: `allure-maven` wiring for combined report generation — files: root
+  `pom.xml` (+`allure-maven-plugin.version` property, `pluginManagement` entry,
+  root-only `<build><plugins>` entry with `<inherited>false</inherited>` and
+  `resultsDirectory` pointed at `${project.basedir}/allure-results`),
+  `ui/pom.xml` + `template/pom.xml` (Surefire `systemPropertyVariables` →
+  `allure.results.directory` = `${maven.multiModuleProjectDirectory}/allure-results`)
+  — done: verified live, all of it.
+
+  `${maven.multiModuleProjectDirectory}` worked exactly as expected: after
+  `mvn -pl ui,template -am test -DrunLive=true`, both modules' results landed
+  in the one shared root `allure-results/` (31 entries, both `SwaggerUiTest`
+  and `NotificationOracleTest` results present; no per-module `allure-results`
+  dir left behind). `mvn clean verify` never triggers `allure:report` (`site`
+  is a separate Maven lifecycle the plugin binds to on its own, confirmed via
+  `maven-help-plugin:describe`).
+
+  Scoping confirmed empirically both ways per the amendment: `mvn -N
+  allure:report` generated exactly one report
+  (`target/site/allure-maven-plugin/index.html`, 29 tests in `summary.json`);
+  a bare `mvn allure:report` (no `-N`), run once on purpose, executed the
+  goal in **all 7** reactor projects (root + every child), producing 7
+  separate report directories - confirmed the exact `gatling:test`-style
+  gotcha and that `-N` (not `<inherited>false</inherited>`) is the real
+  scoping mechanism. Cleaned up the 6 stray per-module report dirs afterward.
+
+  One real deviation from plan.md: pinning `<reportVersion>${allure-bom.version}</reportVersion>`
+  (2.29.1) **failed** - `io.qameta.allure:allure-commandline:zip:2.29.1` isn't
+  resolvable from Maven Central under that coordinate. Reverted to the
+  unpinned default engine (Allure 3, resolved 3.4.1 via its own managed
+  Node.js download, not Maven artifact resolution) - confirmed it correctly
+  reads the existing Allure 2-format `allure-results`. plan.md's Design
+  section updated to match what actually works, not what was originally
+  proposed.
 
 - [ ] T12: open and verify the report, then README — files: root `README.md`
   (new "Reporting" section: the two-command flow, what should be visible),

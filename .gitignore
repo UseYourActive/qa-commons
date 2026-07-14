@@ -2,6 +2,8 @@
 target/
 *.class
 allure-results/
+# allure-maven's local report-engine install cache (Node.js-managed)
+.allure/
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

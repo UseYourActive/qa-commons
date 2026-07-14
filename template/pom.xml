@@ -79,6 +79,12 @@
         <configuration>
           <groups>${groups}</groups>
           <excludedGroups>${excludedGroups}</excludedGroups>
+          <!-- Shared with ui's own Surefire config so both modules' Allure
+               results land in one directory - one combined report at repo
+               root, see plan.md's T11 section. -->
+          <systemPropertyVariables>
+            <allure.results.directory>${maven.multiModuleProjectDirectory}/allure-results</allure.results.directory>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

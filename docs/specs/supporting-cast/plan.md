@@ -352,12 +352,18 @@ assumed:
   **3.0.2**). It manages its own report-generation engine — no separately
   installed Allure commandline needed.
 - It defaults to the Allure 3 (Node.js-managed) report engine, but supports
-  `<reportVersion>` to pin the engine to the Allure 2 line for exact format
-  compatibility with `allure-bom` 2.29.1's result-file format
-  (`allure-rest-assured`/`allure-junit5` 2.29.1 already write Allure 2-shaped
-  `allure-results`). **Decision: pin `<reportVersion>${allure-bom.version}</reportVersion>`
-  (2.29.1)** — same-line compatibility beats defaulting to an unverified
-  cross-major-version reader, and it's one property, already declared.
+  `<reportVersion>` to pin the engine to the Allure 2 line instead.
+  **Tried, then reverted**: pinning `<reportVersion>${allure-bom.version}</reportVersion>`
+  (2.29.1) fails outright — that path resolves `allure-commandline` as a
+  plain Maven artifact (`io.qameta.allure:allure-commandline:zip:2.29.1`),
+  which isn't published to Maven Central under that coordinate/packaging, so
+  the goal fails before it ever reads a result file. The **default**
+  (unpinned) engine, which downloads Allure 3 (observed: 3.4.1) via its own
+  managed Node.js runtime rather than Maven artifact resolution, works and
+  correctly reads the Allure 2-format `allure-results` `api`/`template`/`ui`
+  already write — Allure 3's report generator is designed to be backward-
+  compatible with the Allure 2 result-file format, and that held up in
+  practice. No `<reportVersion>` configured at all.
 - Goal: `mvn allure:report` → static HTML under
   `target/site/allure-maven-plugin/index.html` by default (path itself
   reconfigurable via `reportDirectory`, but the default is fine here).
@@ -392,10 +398,10 @@ per-module ones:
   someone runs the bare (undocumented) form anyway. `resultsDirectory` points
   at `${project.basedir}/allure-results` (root's own basedir *is* the
   reactor root, so no property trick needed on this side).
-- Version/`reportVersion` pinned once in root `pluginManagement`, matching
-  the existing `gatling-maven-plugin`/`exec-maven-plugin` convention of
-  pinning version centrally and configuring actual execution per-module (or,
-  here, at root only).
+- Version pinned once in root `pluginManagement`, matching the existing
+  `gatling-maven-plugin`/`exec-maven-plugin` convention of pinning version
+  centrally and configuring actual execution per-module (or, here, at root
+  only).
 
 Documented flow (root `README.md`):
 ```
@@ -446,11 +452,14 @@ separate step.
   resolution) is new plumbing for this repo and gets a real empirical check
   (write from both `ui` and `template`, confirm both land in one directory)
   before being called done.
-- **`allure-maven` 3.0.2 + `reportVersion=2.29.1`** — the docs confirm the
-  config knob exists; the actual rendered report (with real `ui` screenshot
-  and `api` request/response attachments) still gets opened and eyeballed
-  per the mission's "verified by opening it, not by the plugin running"
-  instruction, not just trusted from the docs.
+- **`allure-maven` 3.0.2 report engine choice** — `reportVersion=2.29.1` was
+  tried and failed for real (`allure-commandline:zip:2.29.1` unresolvable
+  from Central), so the plan reverted to the unpinned default (Allure 3,
+  3.4.1 observed) — confirmed in T11 to correctly read the existing Allure
+  2-format results. The actual rendered report (real `ui` screenshot and
+  `api` request/response attachments) still gets opened and eyeballed per
+  the mission's "verified by opening it, not by the plugin running"
+  instruction (T12), not just trusted from a successful `BUILD SUCCESS`.
 - **Reflective `AllureReporterBridge`** — the one piece of reflection
   anywhere in this codebase (everything else is fully typed). Justified by
   the "zero Allure dependency in `core`, ever" constraint; kept intentionally
