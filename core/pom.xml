@@ -48,5 +48,14 @@
       <artifactId>logback-classic</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test scope only, so AllureReporterBridge's reflective path has
+         something real to call and assert against - never a compile-time
+         (main-scope) Allure dependency in core, and never inherited by
+         qa-commons-core consumers (test-scope deps don't propagate). -->
+    <dependency>
+      <groupId>io.qameta.allure</groupId>
+      <artifactId>allure-java-commons</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
