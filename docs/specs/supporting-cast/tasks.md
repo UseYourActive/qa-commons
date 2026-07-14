@@ -3,20 +3,20 @@
 Branch `feature/supporting-cast`, cut from `main` before T1. One task, one
 commit, in order.
 
-- [ ] T1: `db` module scaffold — files: root `pom.xml` (+`<module>db</module>`,
+- [x] T1: `db` module scaffold — files: root `pom.xml` (+`<module>db</module>`,
   `postgresql`/`testcontainers-bom` version properties + `dependencyManagement`
   entries, `qa-commons-db` internal coordinate), `db/pom.xml` (postgresql main
   scope, slf4j-api main scope, testcontainers-bom import + testcontainers-postgresql
   test scope, junit-jupiter + assertj-core test scope) — done when: `mvn clean
   verify` passes with the new empty module resolving in the reactor.
 
-- [ ] T2: `db` — `DbConfig` env-based record — files:
+- [x] T2: `db` — `DbConfig` env-based record — files:
   `db/src/main/java/dev/qacommons/db/config/DbConfig.java`, test — done when:
   `mvn -pl db test` passes; covers defaults (`localhost`/`5432`/`notificationdb`/
   `postgres`/`postgres`), override via the `fromEnv(Function<String,String>)`
   seam, and `jdbcUrl()` formatting.
 
-- [ ] T3: `db` — `PostgresDatabase` oracle primitive + `DatabaseOracleException` +
+- [x] T3: `db` — `PostgresDatabase` oracle primitive + `DatabaseOracleException` +
   `RowMapper` — files: `db/src/main/java/dev/qacommons/db/PostgresDatabase.java`,
   `db/src/main/java/dev/qacommons/db/RowMapper.java`,
   `db/src/main/java/dev/qacommons/db/DatabaseOracleException.java` — done when:
@@ -25,7 +25,7 @@ commit, in order.
   `SQLException` anywhere (grep confirms no bare `catch (SQLException` without
   a rethrow).
 
-- [ ] T4: `db` — Testcontainers self-tests — files:
+- [x] T4: `db` — Testcontainers self-tests — files:
   `db/src/test/java/dev/qacommons/db/PostgresDatabaseTestcontainersTest.java`
   (+ testcontainers-junit-jupiter dependency if needed beyond the bare
   `testcontainers-postgresql` module) — done when: with Docker running,
@@ -35,7 +35,7 @@ commit, in order.
   command reports these tests **skipped**, not failed, and `mvn clean verify`
   from repo root stays green either way.
 
-- [ ] T5: `template` — `NotificationsOracle` + `NotificationRow` — files:
+- [x] T5: `template` — `NotificationsOracle` + `NotificationRow` — files:
   `template/pom.xml` (+qa-commons-db), `template/src/main/java/dev/qacommons/template/db/NotificationsOracle.java`,
   `template/src/main/java/dev/qacommons/template/db/NotificationRow.java` — done
   when: `mvn -pl template -am compile` succeeds; `findById` queries exactly the
@@ -43,21 +43,17 @@ commit, in order.
   migrations (`id`, `recipient`, `channel`, `locked_by`, `locked_at`,
   `attempts_count`).
 
-- [ ] T6: `template` — live DB oracle proof test — files:
+- [x] T6: `template` — live DB oracle proof test — files:
   `template/src/test/java/dev/qacommons/template/tests/NotificationOracleTest.java`
-  — done when: with the notification service running locally (`docker-compose`
-  DB reachable at the `QA_DB_*` defaults), `mvn -pl template test -DrunLive=true`
-  passes: sends via `NotificationsEndpoint`, looks the row up via
-  `NotificationsOracle.findById`, asserts existence + `recipient`/`channel`
-  match + claim columns are readable — **no assertion on `status`, `lockedBy`,
-  or `lockedAt` values**. Confirms (and records here if it changes the plan)
-  whether the row-write is synchronous with the `202` response, per plan.md's
-  open question — expectation is synchronous (no retry needed); **if** the
-  live service proves otherwise, the lookup is wrapped in Awaitility
-  (test-scope dependency, added here if needed) polling for existence only,
-  never a hand-rolled `Thread.sleep` loop, per the test-architecture skill.
-  Two consecutive runs, no flakes; `mvn -pl template test` (no flag, service
-  down) still passes with zero tests executed.
+  — done: real send → oracle lookup → identity + claim-column assertions,
+  **no retry/Awaitility needed** — the row was found on the very first
+  lookup on both runs, confirming the row-write is synchronous with the
+  `202` response (the outbox-design expectation from plan.md was correct).
+  Two consecutive `mvn -pl template test -DrunLive=true -Dtest=NotificationOracleTest`
+  runs passed clean; `mvn -pl template test` (no flag) passed with zero
+  tests executed. Hit a real environment issue en route - see "Deviations /
+  decisions" below (port 5432 collision) - resolved without touching the
+  oracle code itself.
 
 - [ ] T7: `core` — `Reporter` interface + `Slf4jReporter` + reflective
   `AllureReporterBridge` — files: `core/pom.xml` (+allure-java-commons, test
@@ -124,3 +120,26 @@ commit, in order.
   opening it, not by the plugin running." Also re-verify `mvn clean verify`
   from a clean state with both the target service AND Docker stopped —
   BUILD SUCCESS, zero live tests, zero DB-self-tests failed (skipped instead).
+
+## Deviations / decisions
+
+- **T6**: the local dev machine has a genuine port collision on 5432 - a
+  native, non-Docker `postgres.exe` (unrelated to this mission) also listens
+  on `0.0.0.0:5432`, and Git Bash/native-Windows traffic to `localhost:5432`
+  was landing on that native process instead of the notification service's
+  Docker-forwarded container (confirmed by the container's own logs showing
+  zero connection attempts during the failed runs, and by a standalone JDBC
+  probe reproducing "password authentication failed" against the wrong
+  server). Resolved per the user's direction: remapped the *published* port
+  only, `DB_PORT=15432` in the service's own `.env` + `docker-compose up -d
+  postgres` to recreate just that container - the app is unaffected, since
+  it reaches Postgres over the internal Docker network by service name, not
+  the published port (confirmed: `/q/health/ready` stayed UP throughout).
+  `QA_DB_PORT=15432` on the test run. Explicitly did **not** stop the native
+  install - never touch a system service the user didn't ask to have
+  stopped. Verified we were actually hitting the right database (not just a
+  database) by querying `flyway_schema_history` before trusting any test
+  result - all 4 known migrations (`1.0.0`-`1.0.3`) present. This is a
+  documented known-collision case in `db/README.md` (T12), not a framework
+  bug - `qa-commons-db`'s own Testcontainers self-tests (T4) were unaffected
+  throughout since Testcontainers uses a dynamically-assigned port.
