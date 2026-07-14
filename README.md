@@ -14,6 +14,9 @@ Personal multi-module test automation framework.
 - `api` — typed Endpoint Object layer over RestAssured (`Endpoint<TReq, TRes,
   TErr>`, sealed `ApiResult`). RestAssured is an internal implementation
   detail of this module only.
+- `ui` — Playwright for Java lifecycle (`PlaywrightExtension`), Page Object
+  base, and failure diagnostics (retain-on-failure tracing, screenshot on
+  every soft-assertion failure). See `ui/README.md`.
 - `template` — living example: tests against a notification service proving
   the framework end to end.
 - `perf` — Gatling load tests against the notification service. On-demand
@@ -25,14 +28,20 @@ Personal multi-module test automation framework.
 mvn clean verify
 ```
 
-Runs the full reactor. The `template` module's service-dependent tests are
-tagged `@Tag("live")` and excluded by default, so this passes without any
-external service running. `perf` compiles as part of the reactor but never
-runs here — its `gatling-maven-plugin` has no lifecycle binding, so a
-Gatling run only ever happens via an explicit `mvn -pl perf gatling:test`.
+Runs the full reactor. The `template` and `ui` modules' service-dependent
+tests are tagged `@Tag("live")` and excluded by default, so this passes
+without any external service running — `ui`'s local-only tests (its
+`PlaywrightExtension`/`UiSoftAssertions` lifecycle checks) do launch a real
+headless browser, but skip gracefully rather than fail if Chromium isn't
+installed yet (see `ui/README.md`). `perf` compiles as part of the reactor
+but never runs here — its `gatling-maven-plugin` has no lifecycle binding,
+so a Gatling run only ever happens via an explicit `mvn -pl perf
+gatling:test`.
 
 See `template/README.md` for how to run the live suite against a local
-notification service, and `perf/README.md` for how to run the perf sims.
+notification service, `ui/README.md` for the same plus browser setup and
+reading a Playwright trace, and `perf/README.md` for how to run the perf
+sims.
 
 ## Using qa-commons in your project
 
