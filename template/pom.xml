@@ -46,6 +46,10 @@
       <artifactId>qa-commons-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>dev.qacommons</groupId>
+      <artifactId>qa-commons-db</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.qameta.allure</groupId>
       <artifactId>allure-junit5</artifactId>
     </dependency>
