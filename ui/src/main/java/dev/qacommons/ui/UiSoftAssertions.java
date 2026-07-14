@@ -1,6 +1,7 @@
 package dev.qacommons.ui;
 
 import com.microsoft.playwright.Page;
+import dev.qacommons.core.report.Reporter;
 import java.nio.file.Path;
 import org.assertj.core.api.SoftAssertions;
 import org.slf4j.Logger;
@@ -45,6 +46,7 @@ public class UiSoftAssertions extends SoftAssertions {
             page.screenshot(new Page.ScreenshotOptions().setPath(path));
             LOGGER.error("Soft assertion failed: {} - screenshot saved to {}",
                     error.getMessage(), path.toAbsolutePath());
+            Reporter.fromClasspath().attachment("screenshot", "image/png", path);
         } catch (RuntimeException screenshotFailure) {
             // Never let a diagnostics failure mask the assertion failure it
             // was trying to diagnose.
