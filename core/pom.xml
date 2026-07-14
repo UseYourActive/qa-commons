@@ -37,6 +37,13 @@
       <groupId>net.datafaker</groupId>
       <artifactId>datafaker</artifactId>
     </dependency>
+    <!-- Compile scope, not test - ReportContextExtension implements a JUnit 5
+         extension interface from src/main, same idiom ui's PlaywrightExtension
+         already established. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.junit.jupiter</groupId>
