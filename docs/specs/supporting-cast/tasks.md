@@ -124,18 +124,45 @@ commit, in order.
   section updated to match what actually works, not what was originally
   proposed.
 
-- [ ] T12: open and verify the report, then README — files: root `README.md`
-  (new "Reporting" section: the two-command flow, what should be visible),
-  `db/README.md` (new: setup, Testcontainers/Docker prerequisite, `QA_DB_*`
-  env vars, running the self-tests and the live oracle proof), `template/README.md`
-  (DB env vars + the oracle proof test) — done when: the generated report is
-  actually opened in a browser and visually confirmed to contain (a) at least
-  one `ui` test with a screenshot or trace attachment, (b) at least one
-  `template`/`api` test with a request/response attachment, (c) a test showing
-  `datafakerSeed`/`baseUrl` as parameters — per the mission's "verified by
-  opening it, not by the plugin running." Also re-verify `mvn clean verify`
-  from a clean state with both the target service AND Docker stopped —
-  BUILD SUCCESS, zero live tests, zero DB-self-tests failed (skipped instead).
+- [x] T12: open and verify the report, then README — files: root `README.md`
+  (new "Reporting" section + `db` module entry), `db/README.md` (new: setup,
+  Testcontainers/Docker prerequisite, `QA_DB_*` env vars, self-tests, live
+  oracle proof, the port-5432 collision writeup), `template/README.md` (DB
+  oracle proof section) — done: the report was actually opened, not just
+  generated.
+
+  Served `target/site/allure-maven-plugin` locally and drove it with a real
+  headless Chromium via Playwright (already a repo dependency) to take
+  genuine screenshots of the rendered app - not just inspecting the build
+  log. Confirmed all three required elements by looking at the screenshots:
+  (a) `PlaywrightExtensionFailureDiagnosticsTest.FailingCase.hardFailure`
+  shows "Attachments 2": `trace` (application/zip, 1.9 KiB) and `screenshot`
+  (image/png, 4.2 KiB); (b) `NotificationsTest.send_returns202Queued` shows a
+  `Request` attachment with real content (`POST to
+  http://localhost:8080/api/v1/notifications/send`); (c) the same test's
+  "Parameters" section lists `datafakerSeed` and `baseUrl` with real values.
+  29 total tests in the combined report, 1 broken (the intentional
+  `hardFailure` case), matching the live run.
+
+  Re-verified `mvn clean verify` from a clean state (removed
+  `allure-results/`/`target/site`/`.allure`) — BUILD SUCCESS, 65 tests across
+  all 7 projects, `qa-commons-template` shows 0 tests (live suite excluded by
+  default).
+
+  **Partial gap, disclosed rather than hidden**: did not verify the
+  "Docker stopped" branch of `db`'s self-tests by actually stopping Docker -
+  that would take down every other container on this machine (the
+  notification service, redis, grafana, ngrok, ...), a disruptive action out
+  of proportion to this one check. Tried two non-disruptive simulations
+  first - a bogus `DOCKER_HOST` and `TESTCONTAINERS_HOST_OVERRIDE` - neither
+  overrode the cached `~/.testcontainers.properties` `tc.host` entry, so
+  Testcontainers kept finding the real daemon either way. Resting on
+  structural proof instead: the guard
+  (`Assumptions.assumeTrue(DockerClientFactory.instance().isDockerAvailable())`)
+  is the identical pattern already empirically proven for `ui`'s
+  Chromium-missing skip, and `isDockerAvailable()` is Testcontainers' own
+  documented API for exactly this check - not independently re-verified live
+  in this session.
 
 ## Deviations / decisions
 

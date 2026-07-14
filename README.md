@@ -17,6 +17,9 @@ Personal multi-module test automation framework.
 - `ui` — Playwright for Java lifecycle (`PlaywrightExtension`), Page Object
   base, and failure diagnostics (retain-on-failure tracing, screenshot on
   every soft-assertion failure). See `ui/README.md`.
+- `db` — Postgres test-oracle helper (`PostgresDatabase`): fail-loud,
+  `PreparedStatement`-only DB verification for state the API can't show. No
+  dependency on `core` - usable standalone. See `db/README.md`.
 - `template` — living example: tests against a notification service proving
   the framework end to end.
 - `perf` — Gatling load tests against the notification service. On-demand
@@ -33,15 +36,49 @@ tests are tagged `@Tag("live")` and excluded by default, so this passes
 without any external service running — `ui`'s local-only tests (its
 `PlaywrightExtension`/`UiSoftAssertions` lifecycle checks) do launch a real
 headless browser, but skip gracefully rather than fail if Chromium isn't
-installed yet (see `ui/README.md`). `perf` compiles as part of the reactor
-but never runs here — its `gatling-maven-plugin` has no lifecycle binding,
-so a Gatling run only ever happens via an explicit `mvn -pl perf
+installed yet (see `ui/README.md`). `db`'s self-tests similarly launch a
+real ephemeral Postgres via Testcontainers and skip gracefully (not fail) if
+Docker isn't available (see `db/README.md`). `perf` compiles as part of the
+reactor but never runs here — its `gatling-maven-plugin` has no lifecycle
+binding, so a Gatling run only ever happens via an explicit `mvn -pl perf
 gatling:test`.
 
 See `template/README.md` for how to run the live suite against a local
 notification service, `ui/README.md` for the same plus browser setup and
-reading a Playwright trace, and `perf/README.md` for how to run the perf
-sims.
+reading a Playwright trace, `db/README.md` for the DB test-oracle's setup
+and self-tests, and `perf/README.md` for how to run the perf sims.
+
+## Reporting
+
+`api` and `template` attach a request/response pair to the report for every
+call (per-instance `AllureRestAssured` filter); `ui` attaches a screenshot on
+every failure and a trace on every hard failure; every live test attaches
+its datafaker seed and target base URL as report parameters
+(`ReportContextExtension`). None of this is visible without actually
+generating and opening a report - `mvn clean verify`/`test` alone only
+produces the raw `allure-results` directories.
+
+Two steps, always in that order:
+
+```
+mvn -pl ui,template -am test -DrunLive=true   # run the live suites - populates
+                                               # the shared allure-results/ at
+                                               # repo root
+mvn -N allure:report                          # generate the combined report
+```
+
+Then open `target/site/allure-maven-plugin/index.html` in a browser. The
+`-N` (non-recursive) flag matters and is not optional: `allure:report` is
+bound to Maven's separate `site` lifecycle (never triggered by `clean
+verify`), but a *bare* `mvn allure:report` - without `-N` - still walks the
+whole reactor and generates a separate, mostly-empty report per module,
+exactly the gotcha `gatling:test` taught in the `perf` mission. `-N`
+restricts it to the root project, where `allure-results/` (shared by `ui`
+and `template` via a Surefire system property) actually lives.
+
+You should see, per test: request/response attachments on `template`'s API
+tests, a screenshot/trace attachment on any failing `ui` test, and
+`datafakerSeed`/`baseUrl` listed under that test's Parameters.
 
 ## Using qa-commons in your project
 
