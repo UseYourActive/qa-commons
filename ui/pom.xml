@@ -83,6 +83,15 @@
       <artifactId>logback-classic</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test scope only - this repo's own ui test runs get real Allure
+         attachments; qa-commons-ui stays the Allure-optional module the
+         reporting-allure reference asks for, since test-scope dependencies
+         never propagate to anyone depending on the built jar. -->
+    <dependency>
+      <groupId>io.qameta.allure</groupId>
+      <artifactId>allure-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -93,6 +102,12 @@
         <configuration>
           <groups>${groups}</groups>
           <excludedGroups>${excludedGroups}</excludedGroups>
+          <!-- Shared with template's own Surefire config so both modules'
+               Allure results land in one directory - one combined report at
+               repo root, see plan.md's T11 section. -->
+          <systemPropertyVariables>
+            <allure.results.directory>${maven.multiModuleProjectDirectory}/allure-results</allure.results.directory>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <!--

@@ -16,6 +16,7 @@
     <module>core</module>
     <module>api</module>
     <module>ui</module>
+    <module>db</module>
     <module>template</module>
     <module>perf</module>
   </modules>
@@ -40,6 +41,11 @@
     <!-- Independently-versioned artifacts - not expected to match numerically -->
     <playwright.version>1.61.0</playwright.version>
     <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
+    <!-- Independently-versioned artifacts - not expected to match numerically -->
+    <postgresql.version>42.7.13</postgresql.version>
+    <testcontainers-bom.version>1.21.4</testcontainers-bom.version>
+    <!-- Independently-versioned artifacts - not expected to match numerically -->
+    <allure-maven-plugin.version>3.0.2</allure-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -62,6 +68,13 @@
         <groupId>io.qameta.allure</groupId>
         <artifactId>allure-bom</artifactId>
         <version>${allure-bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers-bom.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -101,6 +114,11 @@
         <artifactId>playwright</artifactId>
         <version>${playwright.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>${postgresql.version}</version>
+      </dependency>
 
       <!-- Internal modules -->
       <dependency>
@@ -116,6 +134,11 @@
       <dependency>
         <groupId>dev.qacommons</groupId>
         <artifactId>qa-commons-ui</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>dev.qacommons</groupId>
+        <artifactId>qa-commons-db</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -165,6 +188,19 @@
           <artifactId>exec-maven-plugin</artifactId>
           <version>${exec-maven-plugin.version}</version>
         </plugin>
+        <!--
+          Declared here for version pinning only. Actual activation lives in
+          this same pom's own <build><plugins> below (root only,
+          <inherited>false</inherited>) - see
+          docs/specs/supporting-cast/plan.md. reportVersion pinned to
+          allure-bom.version so the report engine matches the exact Allure 2
+          result format allure-rest-assured/allure-junit5 already write.
+        -->
+        <plugin>
+          <groupId>io.qameta.allure</groupId>
+          <artifactId>allure-maven</artifactId>
+          <version>${allure-maven-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
     <!--
@@ -210,6 +246,34 @@
             </goals>
           </execution>
         </executions>
+      </plugin>
+      <!--
+        Root-only combined report generation, never inherited by child
+        modules (<inherited>false</inherited> - so a child invoking the goal
+        anyway falls back to the plugin's own module-relative, empty-for-us
+        defaults instead of silently duplicating this report). `allure:report`
+        is bound to Maven's separate "site" lifecycle by the plugin itself
+        (confirmed via `maven-help-plugin:describe`), not to anything in
+        `<executions>` here, so `mvn clean verify` never triggers it.
+
+        The documented command is `mvn -N allure:report` -
+        `<inherited>false</inherited>` alone does NOT scope a directly-
+        invoked goal to just this project: a bare `mvn allure:report` (no
+        `-N`) still walks the whole reactor, the exact gotcha `gatling:test`
+        taught in the perf mission. `-N` (non recursive) is the real
+        scoping mechanism - see plan.md's T11 section, verified both ways.
+
+        ui/template's Surefire runs are configured (systemPropertyVariables)
+        to write to this same shared ${project.basedir}/allure-results, so
+        one report covers both.
+      -->
+      <plugin>
+        <groupId>io.qameta.allure</groupId>
+        <artifactId>allure-maven</artifactId>
+        <inherited>false</inherited>
+        <configuration>
+          <resultsDirectory>${project.basedir}/allure-results</resultsDirectory>
+        </configuration>
       </plugin>
     </plugins>
   </build>

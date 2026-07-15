@@ -3,7 +3,8 @@
 Living example: qa-commons framework exercised against a real notification
 service (create/send, list-failed, a validation-error path, and a
 duplicate-payload path), proving both positive and negative flows through
-the typed `ApiResult`.
+the typed `ApiResult` - plus a DB test-oracle proof (see "DB oracle proof"
+below) that verifies what the API response alone can't show.
 
 ## Run the notification service locally
 
@@ -58,3 +59,19 @@ different host/port:
 ```
 QA_BASE_URL=http://localhost:9090 mvn -pl template -am test -DrunLive=true
 ```
+
+## DB oracle proof
+
+`NotificationOracleTest` sends via `NotificationsEndpoint`, then looks the
+row up directly in the service's Postgres via `NotificationsOracle`
+(`qa-commons-db`) - proving the intake actually persisted a row, not just
+that the API returned `202`. It asserts identity (id/recipient/channel) and
+that the claim columns are *readable*, never their values (`status` races
+the service's poller - see `db/README.md`).
+
+Connection defaults (`QA_DB_HOST`/`QA_DB_PORT`/`QA_DB_NAME`/`QA_DB_USER`/
+`QA_DB_PASSWORD`) match the service's own `docker-compose`/`.env.example`
+Postgres defaults, so no extra config is needed beyond starting the service
+as above. If port `5432` collides with something else already running on
+your machine, see `db/README.md`'s "Known collision" section - override
+with e.g. `QA_DB_PORT=15432 mvn -pl template test -DrunLive=true`.

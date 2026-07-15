@@ -7,6 +7,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Tracing;
+import dev.qacommons.core.report.Reporter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -152,10 +153,12 @@ public final class PlaywrightExtension implements BeforeEachCallback, AfterEachC
                 Path tracePath = newArtifactPath("playwright-traces", ".zip");
                 browserContext.tracing().stop(new Tracing.StopOptions().setPath(tracePath));
                 LOGGER.error("Test failed - trace saved to {}", tracePath.toAbsolutePath());
+                Reporter.fromClasspath().attachment("trace", "application/zip", tracePath);
 
                 Path screenshotPath = newArtifactPath("playwright-screenshots", ".png");
                 page.screenshot(new Page.ScreenshotOptions().setPath(screenshotPath));
                 LOGGER.error("Test failed - screenshot saved to {}", screenshotPath.toAbsolutePath());
+                Reporter.fromClasspath().attachment("screenshot", "image/png", screenshotPath);
             } else {
                 browserContext.tracing().stop();
             }
