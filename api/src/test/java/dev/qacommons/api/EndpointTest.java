@@ -2,6 +2,7 @@ package dev.qacommons.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dev.qacommons.core.config.QaConfig;
@@ -12,6 +13,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,6 +31,9 @@ class EndpointTest {
     }
 
     private record Err(String code) {
+    }
+
+    private record Page<T>(List<T> items, int page, int size) {
     }
 
     private static final class WidgetsEndpoint extends Endpoint<Req, Res, Err> {
@@ -57,10 +62,22 @@ class EndpointTest {
         }
     }
 
+    private static final class WidgetsPageEndpoint extends Endpoint<Void, Page<Res>, Err> {
+        WidgetsPageEndpoint(QaConfig config) {
+            super(config, "/widgets-page", new TypeReference<Page<Res>>() {
+            }, Err.class);
+        }
+
+        ApiResult<Page<Res>, Err> list() {
+            return get("");
+        }
+    }
+
     @BeforeAll
     static void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/widgets", EndpointTest::handle);
+        server.createContext("/widgets-page", EndpointTest::handle);
         server.start();
         config = new QaConfig("http://localhost:" + server.getAddress().getPort(), 1L, Duration.ofSeconds(5));
     }
@@ -93,6 +110,9 @@ class EndpointTest {
             Map<String, String> parsed = parseQuery(rawQuery);
             respond(exchange, 200,
                     "{\"id\":\"" + parsed.getOrDefault("q", "") + "\",\"name\":\"" + rawQuery + "\"}");
+        } else if ("GET".equals(method) && path.equals("/widgets-page")) {
+            respond(exchange, 200, "{\"items\":[{\"id\":\"a\",\"name\":\"Alpha\"},"
+                    + "{\"id\":\"b\",\"name\":\"Beta\"}],\"page\":1,\"size\":2}");
         } else {
             respond(exchange, 500, "{\"code\":\"UNEXPECTED_REQUEST\"}");
         }
@@ -215,5 +235,24 @@ class EndpointTest {
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.expectSuccess().id()).isEqualTo("widgets");
         assertThat(result.expectSuccess().name()).contains("q=widgets").contains("extra=1");
+    }
+
+    @Test
+    void get_genericEnvelope_deserializesElementsWithFullTypeFidelity() {
+        WidgetsPageEndpoint endpoint = new WidgetsPageEndpoint(config);
+
+        ApiResult<Page<Res>, Err> result = endpoint.list();
+
+        assertThat(result.status()).isEqualTo(200);
+        Page<Res> body = result.expectSuccess();
+        assertThat(body.page()).isEqualTo(1);
+        assertThat(body.size()).isEqualTo(2);
+        assertThat(body.items()).hasSize(2);
+        // The failure mode this proves dead: a Class<Page>-only deserialization
+        // path erases Page's type parameter, so each item comes back as a raw
+        // LinkedHashMap instead of a Res - isInstanceOf below is the assertion
+        // that would fail under that erasure.
+        assertThat(body.items().get(0)).isInstanceOf(Res.class).isEqualTo(new Res("a", "Alpha"));
+        assertThat(body.items().get(1)).isInstanceOf(Res.class).isEqualTo(new Res("b", "Beta"));
     }
 }
