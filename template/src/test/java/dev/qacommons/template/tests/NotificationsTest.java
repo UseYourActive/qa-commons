@@ -9,9 +9,10 @@ import dev.qacommons.template.api.FailedNotificationsEndpoint;
 import dev.qacommons.template.api.NotificationsEndpoint;
 import dev.qacommons.template.model.CreateNotificationRequest;
 import dev.qacommons.template.model.ErrorResponse;
-import dev.qacommons.template.model.FailedNotificationsPage;
+import dev.qacommons.template.model.FailedNotificationSummary;
 import dev.qacommons.template.model.NotificationResponse;
 import dev.qacommons.template.model.NotificationStatus;
+import dev.qacommons.template.model.PageResponse;
 import dev.qacommons.template.testdata.NotificationRequests;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -51,10 +52,16 @@ class NotificationsTest {
     void listFailedNotifications_returns200(TestInfo testInfo) {
         FailedNotificationsEndpoint endpoint = new FailedNotificationsEndpoint(config());
 
-        ApiResult<FailedNotificationsPage, ErrorResponse> result = endpoint.list(0, 20);
+        ApiResult<PageResponse<FailedNotificationSummary>, ErrorResponse> result = endpoint.list(0, 20);
 
         assertThat(result.status()).isEqualTo(200);
-        assertThat(result.expectSuccess().items()).isNotNull();
+        PageResponse<FailedNotificationSummary> body = result.expectSuccess();
+        assertThat(body.items()).isNotNull();
+        // Proves the generic TypeReference path against the real service: if
+        // items deserialized as raw LinkedHashMaps instead of
+        // FailedNotificationSummary, this call would throw ClassCastException
+        // rather than return a value.
+        body.items().forEach(item -> assertThat(item.notificationId()).isNotBlank());
     }
 
     @Test
