@@ -131,6 +131,57 @@ ApiResult<WidgetResponse, ErrorResponse> result =
 assertThat(result.expectSuccess().id()).isEqualTo("42");
 ```
 
+### Typing generic responses
+
+A response that is itself generic - a paginated envelope, for example -
+can't be expressed with `Class<TRes>`: type erasure loses the element type,
+so `PageResponse.class` deserializes `items` as raw `LinkedHashMap`s instead
+of the real element type. Before `v0.4.0`, the only fix was a hand-written,
+endpoint-specific wrapper record per paginated resource:
+
+```java
+// Before: a concrete shim record per paginated endpoint
+record WidgetsPage(List<WidgetResponse> items, int page, int size) {}
+
+class WidgetsEndpoint extends Endpoint<Void, WidgetsPage, ErrorResponse> {
+    WidgetsEndpoint(QaConfig config) {
+        super(config, "/widgets", WidgetsPage.class, ErrorResponse.class);
+    }
+
+    ApiResult<WidgetsPage, ErrorResponse> list(int page, int size) {
+        return getWithQuery("", Map.of("page", page, "size", size));
+    }
+}
+```
+
+Since `v0.4.0`, `Endpoint` has a second constructor that takes a Jackson
+`TypeReference<TRes>` instead of a `Class<TRes>`, so a single reusable
+generic `PageResponse<T>` replaces every one-off wrapper:
+
+```java
+// After: one reusable generic envelope, no per-endpoint shim
+record PageResponse<T>(List<T> items, int page, int size, long totalItems, int totalPages) {}
+
+class WidgetsEndpoint extends Endpoint<Void, PageResponse<WidgetResponse>, ErrorResponse> {
+    WidgetsEndpoint(QaConfig config) {
+        super(config, "/widgets", new TypeReference<PageResponse<WidgetResponse>>() {}, ErrorResponse.class);
+    }
+
+    ApiResult<PageResponse<WidgetResponse>, ErrorResponse> list(int page, int size) {
+        return getWithQuery("", Map.of("page", page, "size", size));
+    }
+}
+
+PageResponse<WidgetResponse> page =
+        new WidgetsEndpoint(QaConfig.fromEnv()).list(0, 20).expectSuccess();
+assertThat(page.items()).allSatisfy(w -> assertThat(w).isInstanceOf(WidgetResponse.class));
+```
+
+The `Class<TRes>` constructor is unchanged and stays the right choice for
+non-generic responses - the `TypeReference` constructor is purely additive.
+`template`'s `FailedNotificationsEndpoint` is a real example of this
+conversion (`PageResponse<FailedNotificationSummary>`).
+
 `core` comes in transitively via `api`'s own dependency management; add it
 directly only if you need `QaConfig`/`JsonMapperFactory`/`SeededFaker`
 without the API layer.
