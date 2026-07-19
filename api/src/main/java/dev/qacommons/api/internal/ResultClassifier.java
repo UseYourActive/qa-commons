@@ -1,5 +1,6 @@
 package dev.qacommons.api.internal;
 
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.qacommons.api.ApiResult;
 
@@ -12,7 +13,15 @@ public final class ResultClassifier {
     private ResultClassifier() {
     }
 
-    public static <T, E> ApiResult<T, E> classify(RawResponse response, Class<T> successType, Class<E> errorType,
+    /**
+     * {@code successType} is a {@link JavaType} rather than a {@code Class<T>}
+     * so that callers can carry full generic fidelity (e.g. a
+     * {@code PageResponse<Foo>}) through to deserialization - a plain
+     * {@code Class<T>} would erase the element type. {@code errorType} stays
+     * {@code Class<E>}: no caller of this internal class needs a generic
+     * error body today.
+     */
+    public static <T, E> ApiResult<T, E> classify(RawResponse response, JavaType successType, Class<E> errorType,
             ObjectMapper mapper) {
         int status = response.status();
 

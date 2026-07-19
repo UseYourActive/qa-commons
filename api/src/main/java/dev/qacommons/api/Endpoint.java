@@ -1,5 +1,7 @@
 package dev.qacommons.api;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.qacommons.api.internal.HttpEngine;
 import dev.qacommons.api.internal.RawResponse;
@@ -29,20 +31,50 @@ import java.util.Map;
  *     }
  * }
  * }</pre>
+ *
+ * <p>A response that is itself generic (e.g. a paginated envelope) can't be
+ * expressed as a {@code Class<TRes>} - type erasure would lose the element
+ * type. Use the {@link TypeReference} constructor instead:
+ * <pre>{@code
+ * public final class WidgetsEndpoint extends Endpoint<Void, PageResponse<WidgetResponse>, ErrorResponse> {
+ *     public WidgetsEndpoint(QaConfig config) {
+ *         super(config, "/widgets", new TypeReference<PageResponse<WidgetResponse>>() {}, ErrorResponse.class);
+ *     }
+ *
+ *     public ApiResult<PageResponse<WidgetResponse>, ErrorResponse> list(int page, int size) {
+ *         return getWithQuery("", Map.of("page", page, "size", size));
+ *     }
+ * }
+ * }</pre>
  */
 public abstract class Endpoint<TReq, TRes, TErr> {
 
     private final HttpEngine engine;
     private final ObjectMapper mapper;
     private final String basePath;
-    private final Class<TRes> successType;
+    private final JavaType successType;
     private final Class<TErr> errorType;
 
     protected Endpoint(QaConfig config, String basePath, Class<TRes> successType, Class<TErr> errorType) {
         this.engine = new HttpEngine(config);
         this.mapper = JsonMapperFactory.newMapper();
         this.basePath = basePath;
-        this.successType = successType;
+        this.successType = mapper.getTypeFactory().constructType(successType);
+        this.errorType = errorType;
+    }
+
+    /**
+     * For a success body that is itself generic (e.g. {@code PageResponse<T>})
+     * - a plain {@code Class<TRes>} would erase {@code T} and deserialize its
+     * elements as raw {@code LinkedHashMap}s. Pass an anonymous
+     * {@code TypeReference} subclass to preserve the full type:
+     * {@code new TypeReference<PageResponse<WidgetResponse>>() {}}.
+     */
+    protected Endpoint(QaConfig config, String basePath, TypeReference<TRes> successType, Class<TErr> errorType) {
+        this.engine = new HttpEngine(config);
+        this.mapper = JsonMapperFactory.newMapper();
+        this.basePath = basePath;
+        this.successType = mapper.getTypeFactory().constructType(successType);
         this.errorType = errorType;
     }
 
