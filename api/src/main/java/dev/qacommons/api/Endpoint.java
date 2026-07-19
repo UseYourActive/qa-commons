@@ -90,12 +90,14 @@ public abstract class Endpoint<TReq, TRes, TErr> {
 
     private ApiResult<TRes, TErr> execute(String method, String path, Object[] pathParams, String jsonBody) {
         RawResponse response = engine.execute(method, path, pathParams, jsonBody);
-        return ResultClassifier.classify(response, successType, errorType, mapper);
+        return ResultClassifier.classify(response, mapper.getTypeFactory().constructType(successType), errorType,
+                mapper);
     }
 
     private ApiResult<TRes, TErr> execute(String method, String path, Object[] pathParams,
             Map<String, Object> queryParams, String jsonBody) {
         RawResponse response = engine.execute(method, path, pathParams, queryParams, jsonBody);
-        return ResultClassifier.classify(response, successType, errorType, mapper);
+        return ResultClassifier.classify(response, mapper.getTypeFactory().constructType(successType), errorType,
+                mapper);
     }
 }
